@@ -12,7 +12,10 @@ A complete, reproducible guide to deploying a WireGuard VPN server on DigitalOce
 6. [Add Your First Client](#4-add-your-first-client)
 7. [Client Setup](#5-client-setup-by-platform)
 8. [Verify It Works](#6-verify-it-works)
-9. [Next Steps](#7-next-steps)
+9. [Disable IPv6](#7-disable-ipv6-on-the-client)
+10. [Verify No Leaks](#8-verify-no-leaks)
+11. [Next Steps](#9-next-steps)
+12. [Server IPv6 (Optional)](#10-server-ipv6-optional)
 
 ---
 
@@ -380,35 +383,94 @@ journalctl -u wg-quick@wg0 --no-pager -n 20
 
 ---
 
-## 7. Next Steps
+## 9. Next Steps
 
-- [ ] Add more clients (repeat section 3 for each user)
+- [ ] Disable IPv6 on the client (section 8)
+- [ ] Verify no leaks (section 9)
+- [ ] Add more clients (repeat section 4 for each user)
 - [ ] Restrict the cloud firewall to specific source IP ranges
 - [ ] Set up server monitoring (ping, `wg show` cron job)
 - [ ] Schedule regular OS updates
 - [ ] Back up `/etc/wireguard/` off-server
 
-## 8. IPv6
+## 7. Disable IPv6 on the Client
 
-The WireGuard config above routes **IPv4 only** (`AllowedIPs = 0.0.0.0/0`). IPv6 traffic will bypass the tunnel and leak your real IP.
+The WireGuard config above routes **IPv4 only** (`AllowedIPs = 0.0.0.0/0`). Without disabling IPv6, your IPv6 traffic bypasses the tunnel and leaks your real IP and location.
 
-### Option A — Block IPv6 on the client (simple)
+Disable IPv6 system-wide **before** connecting to the VPN.
 
-Add these lines to the client config under `[Interface]`:
+### Linux
+
+Edit `/etc/sysctl.d/99-disable-ipv6.conf` (create if missing):
 
 ```ini
-PostUp = sysctl -w net.ipv6.conf.all.disable_ipv6=1
-PostDown = sysctl -w net.ipv6.conf.all.disable_ipv6=0
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
 ```
 
-Then reconnect the tunnel.
+Apply immediately:
 
-### Option B — Route IPv6 through the VPN (requires VPS with IPv6)
+```bash
+sudo sysctl -p /etc/sysctl.d/99-disable-ipv6.conf
+```
 
-1. Power off the droplet in DO control panel, enable IPv6, power it back on.
-2. Update the client config to route IPv6: `AllowedIPs = 0.0.0.0/0, ::/0`.
-3. Enable IPv6 forwarding and NAT on the server (similar to the existing iptables rules but for `ip6tables`).
+Verify:
+
+```bash
+cat /proc/sys/net/ipv6/conf/all/disable_ipv6
+# Should output: 1
+```
+
+### Windows
+
+1. Open **Control Panel → Network and Sharing Center → Change adapter settings**
+2. Right-click your active network adapter → **Properties**
+3. Uncheck **Internet Protocol Version 6 (TCP/IPv6)**
+4. Click **OK**
+
+### macOS
+
+```bash
+# Disable IPv6 on Wi-Fi (replace en0 with your interface name)
+networksetup -setv6off Wi-Fi
+
+# Or find your interface name
+ifconfig
+```
+
+---
+
+## 8. Verify No Leaks
+
+With the tunnel **active** and IPv6 disabled:
+
+```bash
+# IPv4 check — should show VPS IP
+curl -4 ifconfig.me
+
+# IPv6 check — should fail (no route)
+curl -6 ifconfig.me
+# Expected: curl: (7) Couldn't connect to server
+
+# Confirm IPv6 is disabled on the client
+ip -6 addr show scope global
+# Should show no global IPv6 addresses
+
+# Full leak test (opens in browser)
+curl https://ipleak.net
+# Scroll down — the "Your IP addresses" section should only show IPv4 from your VPS
+```
 
 ---
 
 For day-to-day operations (adding/removing clients, troubleshooting, key rotation), see [runbook.md](runbook.md).
+
+---
+
+## 10. Server IPv6 (Optional)
+
+The server runs IPv4 only by default. If you need to route IPv6 through the tunnel:
+
+1. **Power off the droplet** in DO control panel → **Enable IPv6** → Power on
+2. **Update client config**: `AllowedIPs = 0.0.0.0/0, ::/0`
+3. **Add IPv6 NAT rules** on the server (similar to the existing iptables rules but using `ip6tables`)

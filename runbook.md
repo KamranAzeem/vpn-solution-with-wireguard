@@ -260,8 +260,9 @@ Make sure `net.ipv4.ip_forward` is set and the firewall allows UDP 51820.
 
 | Possible cause | Check / Fix |
 |----------------|-------------|
-| Client config missing IPv6 block | Add `PostUp / PostDown` to disable IPv6 on the client (see README section 8) |
-| Client routes IPv6 | Check `ip -6 route` while connected — should not show a default route via the tunnel unless IPv6 is configured on the server |
+| IPv6 not disabled on client | Follow the per-OS instructions in README section 8 to disable IPv6 system-wide |
+| IPv6 re-enabled after reboot | Verify `/etc/sysctl.d/99-disable-ipv6.conf` exists and is loaded (Linux) |
+| Client still shows IPv6 address | Run `ip -6 addr show scope global` — should show nothing. If it does, IPv6 is still active |
 
 ### DNS leaks
 
