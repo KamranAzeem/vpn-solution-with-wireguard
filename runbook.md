@@ -256,6 +256,13 @@ Make sure `net.ipv4.ip_forward` is set and the firewall allows UDP 51820.
 | Wrong interface | Run `ip route show default`, confirm the interface in PostUp matches |
 | Client AllowedIPs | Client config must have `AllowedIPs = 0.0.0.0/0` for full tunnel |
 
+### IPv4 works but IPv6 leaks real IP
+
+| Possible cause | Check / Fix |
+|----------------|-------------|
+| Client config missing IPv6 block | Add `PostUp / PostDown` to disable IPv6 on the client (see README section 8) |
+| Client routes IPv6 | Check `ip -6 route` while connected — should not show a default route via the tunnel unless IPv6 is configured on the server |
+
 ### DNS leaks
 
 | Possible cause | Check / Fix |

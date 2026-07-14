@@ -388,4 +388,27 @@ journalctl -u wg-quick@wg0 --no-pager -n 20
 - [ ] Schedule regular OS updates
 - [ ] Back up `/etc/wireguard/` off-server
 
+## 8. IPv6
+
+The WireGuard config above routes **IPv4 only** (`AllowedIPs = 0.0.0.0/0`). IPv6 traffic will bypass the tunnel and leak your real IP.
+
+### Option A — Block IPv6 on the client (simple)
+
+Add these lines to the client config under `[Interface]`:
+
+```ini
+PostUp = sysctl -w net.ipv6.conf.all.disable_ipv6=1
+PostDown = sysctl -w net.ipv6.conf.all.disable_ipv6=0
+```
+
+Then reconnect the tunnel.
+
+### Option B — Route IPv6 through the VPN (requires VPS with IPv6)
+
+1. Power off the droplet in DO control panel, enable IPv6, power it back on.
+2. Update the client config to route IPv6: `AllowedIPs = 0.0.0.0/0, ::/0`.
+3. Enable IPv6 forwarding and NAT on the server (similar to the existing iptables rules but for `ip6tables`).
+
+---
+
 For day-to-day operations (adding/removing clients, troubleshooting, key rotation), see [runbook.md](runbook.md).
