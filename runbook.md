@@ -42,25 +42,39 @@ journalctl -u wg-quick@wg0 -f
 
 ## Adding a Client
 
-### 1. Generate keypair on the server
+### 1. Collect user info
+
+Get the end-user's email address and their device type (`laptop`, `desktop`, `phone`, `tablet`, or `server`). Each device needs its own config — sharing one config across devices causes connection conflicts.
+
+### 2. Generate keypair on the server
 
 ```bash
 ssh root@<your-vps>
 
 cd /etc/wireguard
 umask 077
-CLIENT_NAME="user02"                       # Change per user
+
+email_to_name() {
+  echo "$1" | tr '@.' '-' | tr -s '-'
+}
+
+EMAIL="user@example.com"                   # The end-user's email
+DEVICE="laptop"                            # Device type
+CLIENT_NAME="$(email_to_name "${EMAIL}")-${DEVICE}"
+
 wg genkey | tee "${CLIENT_NAME}.key" | wg pubkey > "${CLIENT_NAME}.key.pub"
 ```
 
-### 2. Find the next available IP
+**Example**: `user@example.com` + `laptop` → `user-example-com-laptop`
+
+### 3. Find the next available IP
 
 ```bash
 wg show
 # Peers use 10.0.0.2, 10.0.0.3, ... — pick the next one
 ```
 
-### 3. Add the peer
+### 4. Add the peer
 
 ```bash
 NEXT_IP=10.0.0.3                           # Adjust
@@ -69,7 +83,7 @@ wg set wg0 peer "${CLIENT_PUB}" allowed-ips "${NEXT_IP}/32"
 wg-quick save wg0
 ```
 
-### 4. Create and deliver the client config
+### 5. Create the client config
 
 ```bash
 SERVER_PUB=$(cat /etc/wireguard/server.key.pub)
@@ -88,14 +102,29 @@ PersistentKeepalive = 25
 EOF
 ```
 
-```bash
-# Generate a QR code for mobile users
-qrencode -t ansiutf8 < "${CLIENT_NAME}.conf"
+### 6. Deliver the config securely
 
-# Or download the file via SCP (from your local machine)
-mkdir -p ~/vpn-clients
-scp root@<your-vps>:/etc/wireguard/user02.conf ~/vpn-clients/
+**:warning: Security warning**: The `.conf` file contains the private key in plaintext. Do NOT send it over unencrypted channels (plain email, Slack, WhatsApp).
+
+**Option A — Encrypted email (recommended for remote users):**
+```bash
+gpg --symmetric --cipher-algo AES256 "${CLIENT_NAME}.conf"
+# Sends "${CLIENT_NAME}.conf.gpg"
 ```
+Send the `.gpg` file via email. Share the decryption password out of band (phone call, Signal).
+
+**Option B — SCP then direct transfer (admin mediates):**
+```bash
+mkdir -p ~/vpn-clients
+scp root@<your-vps>:"/etc/wireguard/${CLIENT_NAME}.conf" ~/vpn-clients/
+```
+Hand the file to the user via USB, encrypted chat, or direct transfer.
+
+**Option C — QR code (mobile only, no file transfer needed):**
+```bash
+qrencode -t ansiutf8 < "${CLIENT_NAME}.conf"
+```
+The user scans the QR code directly in the WireGuard mobile app.
 
 ---
 
@@ -109,9 +138,12 @@ wg set wg0 peer <client-public-key> remove
 wg-quick save wg0
 
 # Delete their key files (optional)
-rm /etc/wireguard/<client-name>.key
-rm /etc/wireguard/<client-name>.key.pub
+rm /etc/wireguard/<name-from-email>-<device>.key
+rm /etc/wireguard/<name-from-email>-<device>.key.pub
+rm /etc/wireguard/<name-from-email>-<device>.conf
 ```
+
+**Removing all devices for a user**: repeat for each device (laptop, phone, etc.) they had.
 
 ---
 

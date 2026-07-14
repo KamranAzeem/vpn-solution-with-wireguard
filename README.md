@@ -8,10 +8,11 @@ A complete, reproducible guide to deploying a WireGuard VPN server on DigitalOce
 2. [Prerequisites](#prerequisites)
 3. [Provision the VPS](#1-provision-the-vps)
 4. [Server Setup](#2-server-setup)
-5. [Add Your First Client](#3-add-your-first-client)
-6. [Client Setup](#4-client-setup-by-platform)
-7. [Verify It Works](#5-verify-it-works)
-8. [Next Steps](#6-next-steps)
+5. [Naming Convention](#3-naming-convention)
+6. [Add Your First Client](#4-add-your-first-client)
+7. [Client Setup](#5-client-setup-by-platform)
+8. [Verify It Works](#6-verify-it-works)
+9. [Next Steps](#7-next-steps)
 
 ---
 
@@ -186,18 +187,57 @@ No peers yet — that is normal. You will add them next.
 
 ---
 
-## 3. Add Your First Client
+## 3. Naming Convention
 
-### 3a. Generate a client keypair on the server
+Each client is identified by the user's email address (flattened to kebab case) and the device type.
+
+**Formula**: `<email-kebab>-<device-type>`
+
+```
+kamran@wbitt.com → kamran-wbitt-com
+then append device: kamran-wbitt-com-laptop, kamran-wbitt-com-phone
+```
+
+Use this helper to flatten an email on the server:
+
+```bash
+email_to_name() {
+  echo "$1" | tr '@.' '-' | tr -s '-'
+}
+
+# Example
+email_to_name "kamran@wbitt.com"
+# Output: kamran-wbitt-com
+```
+
+Supported device types: `laptop`, `desktop`, `phone`, `tablet`, `server`.
+
+---
+
+## 4. Add Your First Client
+
+### 4a. Collect user info
+
+Before you start, get the end-user's email address and their device type(s). Each device gets its own keypair and tunnel IP — sharing a config between devices causes them to fight the connection.
+
+### 4b. Generate a client keypair on the server
 
 ```bash
 cd /etc/wireguard
 umask 077
-CLIENT_NAME="user01"
+
+email_to_name() {
+  echo "$1" | tr '@.' '-' | tr -s '-'
+}
+
+EMAIL="kamran@wbitt.com"
+DEVICE="laptop"
+CLIENT_NAME="$(email_to_name "${EMAIL}")-${DEVICE}"
+
 wg genkey | tee "${CLIENT_NAME}.key" | wg pubkey > "${CLIENT_NAME}.key.pub"
 ```
 
-### 3b. Add the peer to the server
+### 4c. Add the peer to the server
 
 ```bash
 CLIENT_PUB=$(cat /etc/wireguard/"${CLIENT_NAME}.key.pub")
@@ -207,9 +247,11 @@ wg-quick save wg0
 
 (Next client gets `10.0.0.3/32`, then `10.0.0.4/32`, and so on.)
 
-### 3c. Create the client config
+### 4d. Create the client config
 
 ```bash
+SERVER_PUB=$(cat /etc/wireguard/server.key.pub)
+
 cat > "/etc/wireguard/${CLIENT_NAME}.conf" << WGEOF
 [Interface]
 Address = 10.0.0.2/24
@@ -217,28 +259,44 @@ PrivateKey = $(cat /etc/wireguard/${CLIENT_NAME}.key)
 DNS = 1.1.1.1
 
 [Peer]
-PublicKey = $(cat /etc/wireguard/server.key.pub)
+PublicKey = ${SERVER_PUB}
 Endpoint = <your-vps-ip-or-hostname>:51820
 AllowedIPs = 0.0.0.0/0
 PersistentKeepalive = 25
 WGEOF
 ```
 
-### 3d. Transfer the config to the client machine
+### 4e. Deliver the config
 
-**Via SCP (download from server to your local machine):**
+**:warning: Security warning**: The `.conf` file contains the private key in plaintext. Do NOT send it over unencrypted channels (plain email, Slack, WhatsApp).
+
+Recommended delivery methods (in order of security):
+
+**Option A — Encrypted email attachment:**
 ```bash
-scp root@<your-vps>:/etc/wireguard/user01.conf .
+# Encrypt the config with a password (AES256)
+gpg --symmetric --cipher-algo AES256 "/etc/wireguard/${CLIENT_NAME}.conf"
+
+# Send the .gpg file via email
+# Share the decryption password out of band (phone call, Signal, etc.)
 ```
 
-**Via QR code (for mobile):**
+**Option B — SCP (admin downloads, then passes to user directly):**
 ```bash
-qrencode -t ansiutf8 < /etc/wireguard/user01.conf
+mkdir -p ~/vpn-clients
+scp root@<your-vps>:"/etc/wireguard/${CLIENT_NAME}.conf" ~/vpn-clients/
 ```
+Transfer the file to the user via a secure channel (USB, encrypted chat, direct transfer).
+
+**Option C — QR code (for mobile apps only, does not expose the key to email):**
+```bash
+qrencode -t ansiutf8 < "/etc/wireguard/${CLIENT_NAME}.conf"
+```
+The user scans the QR code directly in the WireGuard mobile app.
 
 ---
 
-## 4. Client Setup (by Platform)
+## 5. Client Setup (by Platform)
 
 ### Windows
 
@@ -276,7 +334,7 @@ sudo wg-quick down wg-client
 
 ---
 
-## 5. Verify It Works
+## 6. Verify It Works
 
 While connected to the VPN:
 
@@ -307,7 +365,7 @@ journalctl -u wg-quick@wg0 --no-pager -n 20
 
 ---
 
-## 6. Next Steps
+## 7. Next Steps
 
 - [ ] Add more clients (repeat section 3 for each user)
 - [ ] Restrict the cloud firewall to specific source IP ranges
