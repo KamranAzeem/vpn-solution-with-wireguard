@@ -300,14 +300,14 @@ The user scans the QR code directly in the WireGuard mobile app.
 
 ### Windows
 
-1. Download from [wireguard.com/install](https://www.wireguard.com/install/)
+1. Download and install from [wireguard.com/install](https://www.wireguard.com/install/)
 2. Open WireGuard → **Import tunnel(s) from file**
 3. Select the `.conf` file
 4. Click **Activate**
 
 ### macOS
 
-1. Download from [wireguard.com/install](https://www.wireguard.com/install/) or App Store
+1. Download and install from [wireguard.com/install](https://www.wireguard.com/install/) or App Store
 2. Open WireGuard → **Import tunnel(s) from file**
 3. Select the `.conf` file
 4. Click **Activate**
@@ -321,9 +321,24 @@ The user scans the QR code directly in the WireGuard mobile app.
 
 ### Linux (command line)
 
+Install the client tools:
+
+```bash
+# Fedora / RHEL / CentOS
+sudo dnf install -y wireguard-tools
+
+# Ubuntu / Debian
+sudo apt update && sudo apt install -y wireguard
+
+# Arch
+sudo pacman -S wireguard-tools
+```
+
+Import and connect:
+
 ```bash
 # Copy the .conf file to /etc/wireguard/
-sudo cp user01.conf /etc/wireguard/wg-client.conf
+sudo cp kamranazeem-gmail-com-laptop.conf /etc/wireguard/wg-client.conf
 
 # Connect
 sudo wg-quick up wg-client

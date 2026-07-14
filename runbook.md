@@ -245,6 +245,7 @@ Make sure `net.ipv4.ip_forward` is set and the firewall allows UDP 51820.
 | Peer not added | `wg show` on server — does the client public key appear? |
 | Firewall blocking | Check cloud firewall allows UDP 51820 inbound. |
 | Config error | Verify client config has the correct server public key, endpoint IP, and private key. |
+| Client tools not installed | Run `which wg-quick` — if empty, install wireguard-tools (dnf/apt/pacman) |
 
 ### No internet through the tunnel
 
