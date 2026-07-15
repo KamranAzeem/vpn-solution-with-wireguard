@@ -16,8 +16,9 @@ A complete, reproducible guide to deploying a WireGuard VPN server on DigitalOce
 9. [Disable IPv6](#7-disable-ipv6-on-the-client)
 10. [Verify No Leaks](#8-verify-no-leaks)
 11. [Targeted Kill Switch](#9-targeted-kill-switch-split-tunnel)
-12. [Next Steps](#10-next-steps)
-13. [Server IPv6 (Optional)](#11-server-ipv6-optional)
+12. [Source IP Restriction](#10-source-ip-restriction-optional)
+13. [Next Steps](#11-next-steps)
+14. [Server IPv6 (Optional)](#12-server-ipv6-optional)
 
 ---
 
@@ -505,6 +506,8 @@ For day-to-day operations (adding/removing clients, troubleshooting, key rotatio
 
 A full kill switch blocks everything when the VPN drops. That is too aggressive when you still want regular internet (email, search, news) to work normally. The right approach is a **targeted kill switch**: only the sensitive US service is blocked outside the tunnel; everything else routes directly.
 
+**Important**: This protects against **accidental exposure** — a brief tunnel drop that causes the browser to retry over the normal connection. It does not prevent a user from deliberately turning off the VPN and accessing the service. That is a policy matter, not something a VPN can solve on an unmanaged personal device.
+
 The right approach depends on the service:
 
 - **Static IP range** (known, fixed IPs): split tunnel via `AllowedIPs` + iptables block on those specific IPs.
@@ -637,7 +640,31 @@ function FindProxyForURL(url, host) {
 - If the VPN drops, the proxy IP (`192.168.111.1`) becomes unreachable — the service cannot be reached.
 - All other traffic works normally through the browser or other apps.
 
-## 10. Next Steps
+## 10. Source IP Restriction (Optional)
+
+By default, UDP 51820 is open to `0.0.0.0/0`. Anyone with a valid client config can connect from anywhere.
+
+If you want to restrict which networks can reach the VPN server (defense in depth), add source IP rules to your cloud firewall:
+
+| Restriction level | DigitalOcean Cloud Firewall rule | Effect |
+|-------------------|----------------------------------|--------|
+| Country-wide | Source: Pakistan IP ranges | Only users in Pakistan can connect. Users travelling abroad are blocked. |
+| City / ISP | Source: specific ISP netblocks | Tightest control, but requires knowing all relevant IP ranges. |
+| None | Source: `0.0.0.0/0` | Anyone with a valid config can connect from anywhere. |
+
+**Tradeoff**: Source IP restriction prevents a stolen config from being used outside the allowed region. But it also blocks legitimate users when they travel. WireGuard's crypto (unique keys per client) already prevents unauthorized connection without a valid config.
+
+To find Pakistan IP ranges:
+
+```bash
+whois -h whois.radb.net -- '-i origin AS17557' | grep route:
+```
+
+(Repeat for other Pakistan ASNs: AS24439, AS38193, AS55803.)
+
+---
+
+## 11. Next Steps
 
 - [ ] Disable IPv6 on the client (section 7)
 - [ ] Verify no leaks (section 8)
@@ -648,7 +675,7 @@ function FindProxyForURL(url, host) {
 - [ ] Schedule regular OS updates
 - [ ] Back up `/etc/wireguard/` off-server
 
-## 11. Server IPv6 (Optional)
+## 12. Server IPv6 (Optional)
 
 The server runs IPv4 only by default. If you need to route IPv6 through the tunnel:
 

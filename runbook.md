@@ -134,10 +134,14 @@ If any required package is missing, the script prints the install command and ex
 wg show
 ```
 
-### 5. Configure DigitalOcean Cloud Firewall
+### 5. Configure Cloud Firewall
 
-- Inbound: UDP 51820 from `0.0.0.0/0`
-- Inbound: TCP 22 from your IP only
+| Direction | Protocol | Port / Type | Source | Purpose |
+|-----------|----------|-------------|--------|---------|
+| Inbound | UDP | 51820 | `0.0.0.0/0` | WireGuard VPN |
+| Inbound | TCP | 22 | Your IP only | SSH access |
+
+To restrict WireGuard access to specific countries or networks (e.g. Pakistan only), replace `0.0.0.0/0` with the relevant IP ranges. See README section 10 for details.
 
 ---
 

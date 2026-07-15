@@ -83,6 +83,8 @@ umask 077
 wg genkey | tee client.key | wg pubkey > client.key.pub
 CLIENT_PUB=$(cat client.key.pub)
 
+ALLOWED_IPS="${ALLOWED_IPS:-0.0.0.0/0}"
+
 cat > "${CLIENT_NAME}.conf" << WGEOF
 [Interface]
 Address = ${AVAILABLE_IP}/24
@@ -92,7 +94,7 @@ DNS = ${WG_DNS:-1.1.1.1}
 [Peer]
 PublicKey = ${SERVER_PUB}
 Endpoint = ${WG_ENDPOINT:-vpn.do.wbitt.com}:${WG_PORT:-51820}
-AllowedIPs = 0.0.0.0/0
+AllowedIPs = ${ALLOWED_IPS}
 PersistentKeepalive = 25
 WGEOF
 

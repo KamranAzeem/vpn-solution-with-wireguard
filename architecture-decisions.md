@@ -70,6 +70,14 @@ Setting SELinux to permissive avoids this without fully disabling SELinux — it
 
 `wg show` only shows the current runtime state. It does not persist across reboots or track which IPs are freed after a client is removed. The JSON DB is the authoritative record of which IPs are allocated and to whom. The `wg0.conf` file and the running WireGuard interface are derived from the DB, not the other way around.
 
+## Why the Kill Switch Only Covers Accidental Exposure
+
+The targeted kill switch (iptables REJECT on specific IPs, or SOCKS5 proxy) protects against a brief tunnel drop where the browser retries over the normal connection. It is not designed to prevent a user from deliberately turning off the VPN. On an unmanaged personal device, there is no technical solution for willful bypass — that is a policy and trust matter. The scripts and configs therefore focus on the accidental case: if the tunnel drops, the sensitive service becomes unreachable until the tunnel is restored.
+
+## Why Source IP Restriction Is Optional
+
+WireGuard requires the correct private key and server public key to establish a handshake. Without a valid config, nobody can connect — there is no password to guess, no brute-force surface. Restricting UDP 51820 to specific source IP ranges (e.g. Pakistan) adds defense in depth but prevents legitimate use when travelling. The default is open (`0.0.0.0/0`) with documentation on how to restrict if desired.
+
 ## Why Scripts Over Manual Commands
 
 Every operation (add, delete, rotate, email) is scripted so that:
