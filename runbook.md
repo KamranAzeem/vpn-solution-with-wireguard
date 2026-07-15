@@ -15,6 +15,7 @@ Day-to-day commands for running, maintaining, and troubleshooting a WireGuard VP
 - [Rotating the Server Key](#rotating-the-server-key)
 - [Backup](#backup)
 - [Restore](#restore)
+- [Expanding the IP Pool](#expanding-the-ip-pool)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -67,6 +68,18 @@ journalctl -u wg-quick@wg0 -f
 ---
 
 ## Deploying Scripts to the Server
+
+### Prerequisites on the server
+
+```bash
+# Scripts require these tools
+dnf install -y jq qrencode
+
+# For email delivery (optional)
+dnf install -y msmtp
+```
+
+### Deploy
 
 ```bash
 # From your local machine
@@ -188,6 +201,48 @@ systemctl enable --now wg-quick@wg0
 ```
 
 Make sure `net.ipv4.ip_forward` is set and the firewall allows UDP 51820.
+
+---
+
+## Expanding the IP Pool
+
+When the IP pool runs out (all IPs from `.2` to `.254` are allocated), you need a larger subnet.
+
+### On a fresh VPN (before any clients)
+
+Edit `ip-allocations.json` and change the `pool` and all IPs to a larger range, e.g. `10.0.0.0/16`:
+
+```bash
+# Regenerate the DB with a new subnet
+ssh root@<your-vps>
+python3 -c "
+import json
+
+network = '10.0.0'
+allocations = {}
+for i in range(1, 255):
+    ip = f'{network}.{i}'
+    allocations[ip] = 'server' if i == 1 else None
+
+with open('/etc/wireguard/ip-allocations.json') as f:
+    db = json.load(f)
+
+db['pool'] = '10.0.0.0/24'
+db['server'] = '10.0.0.1'
+db['allocations'] = allocations
+
+with open('/etc/wireguard/ip-allocations.json', 'w') as f:
+    json.dump(db, f, indent=2)
+"
+```
+
+Then update `/etc/wireguard/wg0.conf` with the new server IP and restart.
+
+### If clients already exist
+
+You need a different approach: add a second pool. The current scripts only manage a single `ip-allocations.json`. To support multiple pools, a future enhancement would be needed.
+
+For now, expand the pool by switching to a `/23` subnet which doubles the IPs. Regenerate the DB manually following the pattern above.
 
 ---
 

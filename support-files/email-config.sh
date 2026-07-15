@@ -3,6 +3,8 @@ set -euo pipefail
 
 WG_DIR="/etc/wireguard"
 CLIENTS_DIR="${WG_DIR}/clients"
+DB="${WG_DIR}/ip-allocations.json"
+FROM_EMAIL=$(jq -r '.from_email // "vpn-admin@example.com"' "$DB")
 
 usage() {
   echo "Usage: $0 --name <client-name> --email <recipient-email>"
@@ -71,15 +73,15 @@ To import:
   2. Open the app and import the attached .conf file
   3. Activate the tunnel
 
-Server endpoint: $(jq -r '.endpoint // "vpn.do.wbitt.com"' /etc/wireguard/ip-allocations.json):51820
-Your IP: $(jq -r --arg n "$CLIENT_NAME" '.allocations | to_entries[] | select(.value == $n) | .key' /etc/wireguard/ip-allocations.json)
+Server endpoint: $(jq -r '.endpoint // "vpn.do.wbitt.com"' "$DB"):51820
+Your IP: $(jq -r --arg n "$CLIENT_NAME" '.allocations | to_entries[] | select(.value == $n) | .key' "$DB")
 
 The decryption password was shared with you separately.
 
 This is an automated message from the VPN server."
 
 {
-  echo "From: WireGuard VPN <kamranazeem@gmail.com>"
+  echo "From: WireGuard VPN <${FROM_EMAIL}>"
   echo "To: ${RECIPIENT}"
   echo "Subject: ${SUBJECT}"
   echo "MIME-Version: 1.0"
