@@ -192,14 +192,17 @@ No peers yet — that is normal. You will add them next.
 
 ## 3. Naming Convention
 
-Each client is identified by the user's email address (flattened to kebab case) and the device type.
+Each client is identified by the user's email (flattened to kebab), device type, and a descriptive alias.
 
-**Formula**: `<email-kebab>-<device-type>`
+**Formula**: `<email-kebab>-<device-type>-<alias>`
 
-```
-kamran@wbitt.com → kamran-wbitt-com
-then append device: kamran-wbitt-com-laptop, kamran-wbitt-com-phone
-```
+| Email | Device | Alias | Result |
+|-------|--------|-------|--------|
+| kamran@wbitt.com | laptop | office | `kamran-wbitt-com-laptop-office` |
+| kamran@wbitt.com | laptop | personal | `kamran-wbitt-com-laptop-personal` |
+| kamran@wbitt.com | phone | personal | `kamran-wbitt-com-phone-personal` |
+
+The alias lets you have multiple devices of the same type (office laptop, personal laptop, Linux laptop, etc.).
 
 Use this helper to flatten an email on the server:
 
@@ -221,7 +224,9 @@ Supported device types: `laptop`, `desktop`, `phone`, `tablet`, `server`.
 
 ### 4a. Collect user info
 
-Before you start, get the end-user's email address and their device type(s). Each device gets its own keypair and tunnel IP — sharing a config between devices causes them to fight the connection.
+Before you start, get the end-user's **email**, **device type**, and a short **alias** describing the device (e.g. office, personal, linux, home). Each device gets its own keypair and tunnel IP — sharing a config between devices causes them to fight the connection.
+
+**Example**: Kamran has an office laptop and a personal laptop → two entries: `kamran-wbitt-com-laptop-office` and `kamran-wbitt-com-laptop-personal`.
 
 ### 4b. Generate a client keypair on the server
 
@@ -235,7 +240,8 @@ email_to_name() {
 
 EMAIL="kamran@wbitt.com"
 DEVICE="laptop"
-CLIENT_NAME="$(email_to_name "${EMAIL}")-${DEVICE}"
+ALIAS="office"
+CLIENT_NAME="$(email_to_name "${EMAIL}")-${DEVICE}-${ALIAS}"
 
 wg genkey | tee "${CLIENT_NAME}.key" | wg pubkey > "${CLIENT_NAME}.key.pub"
 ```
@@ -271,7 +277,7 @@ WGEOF
 
 ### 4e. Deliver the config
 
-**:warning: Security warning**: The `.conf` file contains the private key in plaintext. Do NOT send it over unencrypted channels (plain email, Slack, WhatsApp).
+**Security warning**: The `.conf` file contains the private key in plaintext. Do NOT send it over unencrypted channels (plain email, Slack, WhatsApp).
 
 Recommended delivery methods (in order of security):
 
@@ -341,7 +347,7 @@ Import and connect:
 
 ```bash
 # Copy the .conf file to /etc/wireguard/
-sudo cp kamranazeem-gmail-com-laptop.conf /etc/wireguard/wg-client.conf
+sudo cp <client-name>.conf /etc/wireguard/wg-client.conf
 
 # Connect
 sudo wg-quick up wg-client
@@ -382,16 +388,6 @@ journalctl -u wg-quick@wg0 --no-pager -n 20
 ```
 
 ---
-
-## 9. Next Steps
-
-- [ ] Disable IPv6 on the client (section 8)
-- [ ] Verify no leaks (section 9)
-- [ ] Add more clients (repeat section 4 for each user)
-- [ ] Restrict the cloud firewall to specific source IP ranges
-- [ ] Set up server monitoring (ping, `wg show` cron job)
-- [ ] Schedule regular OS updates
-- [ ] Back up `/etc/wireguard/` off-server
 
 ## 7. Disable IPv6 on the Client
 
@@ -478,6 +474,16 @@ Overhead is minimal — the VPN is suitable for browsing, streaming, and general
 For day-to-day operations (adding/removing clients, troubleshooting, key rotation), see [runbook.md](runbook.md).
 
 ---
+
+## 9. Next Steps
+
+- [ ] Disable IPv6 on the client (section 7)
+- [ ] Verify no leaks (section 8)
+- [ ] Add more clients (repeat section 4 for each user)
+- [ ] Restrict the cloud firewall to specific source IP ranges
+- [ ] Set up server monitoring (ping, `wg show` cron job)
+- [ ] Schedule regular OS updates
+- [ ] Back up `/etc/wireguard/` off-server
 
 ## 10. Server IPv6 (Optional)
 

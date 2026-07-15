@@ -44,7 +44,7 @@ journalctl -u wg-quick@wg0 -f
 
 ### 1. Collect user info
 
-Get the end-user's email address and their device type (`laptop`, `desktop`, `phone`, `tablet`, or `server`). Each device needs its own config — sharing one config across devices causes connection conflicts.
+Get the end-user's **email**, **device type** (`laptop`, `desktop`, `phone`, `tablet`, `server`), and a short **alias** describing the device (e.g. office, personal, linux, home). Each device needs its own config — sharing one config across devices causes connection conflicts.
 
 ### 2. Generate keypair on the server
 
@@ -60,12 +60,13 @@ email_to_name() {
 
 EMAIL="user@example.com"                   # The end-user's email
 DEVICE="laptop"                            # Device type
-CLIENT_NAME="$(email_to_name "${EMAIL}")-${DEVICE}"
+ALIAS="office"                             # Device alias
+CLIENT_NAME="$(email_to_name "${EMAIL}")-${DEVICE}-${ALIAS}"
 
 wg genkey | tee "${CLIENT_NAME}.key" | wg pubkey > "${CLIENT_NAME}.key.pub"
 ```
 
-**Example**: `user@example.com` + `laptop` → `user-example-com-laptop`
+**Example**: `user@example.com` + `laptop` + `office` → `user-example-com-laptop-office`
 
 ### 3. Find the next available IP
 
@@ -104,7 +105,7 @@ EOF
 
 ### 6. Deliver the config securely
 
-**:warning: Security warning**: The `.conf` file contains the private key in plaintext. Do NOT send it over unencrypted channels (plain email, Slack, WhatsApp).
+**Security warning**: The `.conf` file contains the private key in plaintext. Do NOT send it over unencrypted channels (plain email, Slack, WhatsApp).
 
 **Option A — Encrypted email (recommended for remote users):**
 ```bash
@@ -138,12 +139,12 @@ wg set wg0 peer <client-public-key> remove
 wg-quick save wg0
 
 # Delete their key files (optional)
-rm /etc/wireguard/<name-from-email>-<device>.key
-rm /etc/wireguard/<name-from-email>-<device>.key.pub
-rm /etc/wireguard/<name-from-email>-<device>.conf
+rm /etc/wireguard/<name-from-email>-<device>-<alias>.key
+rm /etc/wireguard/<name-from-email>-<device>-<alias>.key.pub
+rm /etc/wireguard/<name-from-email>-<device>-<alias>.conf
 ```
 
-**Removing all devices for a user**: repeat for each device (laptop, phone, etc.) they had.
+**Removing all devices for a user**: repeat for each device+alias combination they had.
 
 ---
 
