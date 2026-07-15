@@ -14,7 +14,7 @@ A complete, reproducible guide to deploying a WireGuard VPN server on DigitalOce
 8. [Verify It Works](#6-verify-it-works)
 9. [Disable IPv6](#7-disable-ipv6-on-the-client)
 10. [Verify No Leaks](#8-verify-no-leaks)
-11. [Kill Switch](#9-kill-switch)
+11. [Targeted Kill Switch](#9-targeted-kill-switch-split-tunnel)
 12. [Next Steps](#10-next-steps)
 13. [Server IPv6 (Optional)](#11-server-ipv6-optional)
 
@@ -255,6 +255,8 @@ wg set wg0 peer "${CLIENT_PUB}" allowed-ips 10.0.0.2/32
 wg-quick save wg0
 ```
 
+For the sensitive service approach, replace `AllowedIPs` in step 4d with the service's IP range instead of `0.0.0.0/0`. See section 9 for details.
+
 (Next client gets `10.0.0.3/32`, then `10.0.0.4/32`, and so on.)
 
 ### 4d. Create the client config
@@ -476,49 +478,141 @@ For day-to-day operations (adding/removing clients, troubleshooting, key rotatio
 
 ---
 
-## 9. Kill Switch
+## 9. Targeted Kill Switch (Split Tunnel)
 
-A kill switch blocks all non-VPN traffic if the tunnel drops. Without one, a brief disconnect can expose your real IP to the service you are accessing. This protects sensitive accounts from being terminated.
+A full kill switch blocks everything when the VPN drops. That is too aggressive when you still want regular internet (email, search, news) to work normally. The right approach is a **targeted kill switch**: only the sensitive US service is blocked outside the tunnel; everything else routes directly.
 
-### Linux (iptables)
+The right approach depends on the service:
 
-Add these lines to the client config under `[Interface]` (before the `[Peer]` section):
+- **Static IP range** (known, fixed IPs): split tunnel via `AllowedIPs` + iptables block on those specific IPs.
+- **Dynamic domain** (CDN-backed, IPs change): SOCKS5 proxy on the VPN server — only the proxy traffic uses the tunnel.
+
+---
+
+### Option A — Static IP Service
+
+For a service with a known, fixed IP range (e.g. `198.51.100.0/24`):
+
+**Step 1 — Client config**
+
+Replace `AllowedIPs = 0.0.0.0/0` with the specific IP range, and add a targeted block rule:
 
 ```ini
-PostUp = iptables -I OUTPUT ! -o %i -m mark ! --mark $(wg show %i fwmark) -j REJECT
-PreDown = iptables -D OUTPUT ! -o %i -m mark ! --mark $(wg show %i fwmark) -j REJECT
+[Interface]
+Address = 192.168.111.2/24
+PrivateKey = <private-key>
+DNS = 1.1.1.1
+
+# Only block the sensitive IPs outside the tunnel
+PostUp = iptables -I OUTPUT -d 198.51.100.0/24 ! -o %i -j REJECT
+PreDown = iptables -D OUTPUT -d 198.51.100.0/24 ! -o %i -j REJECT
+
+[Peer]
+PublicKey = <server-public-key>
+Endpoint = vpn.do.wbitt.com:51820
+AllowedIPs = 198.51.100.0/24
+PersistentKeepalive = 25
 ```
 
-`%i` is automatically replaced by `wg-quick` with your interface name (e.g. `wg-client`). These rules reject any outbound packet that is not going through the tunnel or carrying the tunnel's firewall mark.
+**How it works**:
+- Traffic to `198.51.100.x` is routed through the tunnel. If the tunnel drops, the iptables REJECT rule catches it — the service becomes unreachable.
+- Traffic to any other IP (Google, email, etc.) goes through the normal network interface. The internet works normally regardless of VPN state.
 
-To verify the rules are active:
+**Verify**:
+```bash
+# Confirm the sensitive IPs are routed through the tunnel
+traceroute 198.51.100.1
+# Should show 192.168.111.1 (WG server) as the first hop
+
+# Confirm normal traffic bypasses the tunnel
+traceroute 8.8.8.8
+# Should show your home router (192.168.x.1), NOT the WG server
+```
+
+---
+
+### Option B — Dynamic / CDN-Backed Service
+
+For services behind a CDN (Cloudflare, AWS, Akamai) where IPs change frequently, IP-based rules are unreliable. The cleanest solution is a **SOCKS5 proxy on the VPN server**.
+
+**Step 1 — Install a SOCKS5 proxy on the VPS**
 
 ```bash
-sudo iptables -L OUTPUT -v
-# Look for REJECT rules referencing wg-client
+ssh root@<your-vps>
+
+dnf install -y dante-server
 ```
 
-### Windows
+Create `/etc/danted.conf`:
 
-1. Open the WireGuard app
-2. Select your tunnel → **Edit**
-3. Check **Block untunneled traffic (kill-switch)**
-4. Click **Save** and **Activate**
+```
+internal: 0.0.0.0 port = 1080
+external: ens3
 
-### macOS
+method: none
 
-1. Open the WireGuard app
-2. Select your tunnel → **Settings** (gear icon)
-3. Check **Block untunneled traffic (kill-switch)**
-4. Click **Save** and **Activate**
+client pass {
+    from: 0.0.0.0/0 to: 0.0.0.0/0
+    log: error
+}
 
-### iOS / Android
+socks pass {
+    from: 0.0.0.0/0 to: 0.0.0.0/0
+    log: error
+}
+```
 
-1. Open the WireGuard app
-2. Tap the tunnel name → **Edit**
-3. Toggle **On-Demand** to **On**
-4. Toggle **Block untunneled traffic (kill-switch)**
-5. Tap **Save** → **Activate**
+Start the proxy:
+
+```bash
+systemctl enable --now danted
+```
+
+Now add a firewall rule to allow SOCKS5 connections through the tunnel (so the proxy is only reachable when the VPN is up):
+
+```bash
+iptables -A INPUT -p tcp --dport 1080 -i wg0 -j ACCEPT
+```
+
+**Step 2 — Client config**
+
+Route only the tunnel traffic to the VPN (keep `AllowedIPs` on the specific tunnel subnet if using split, or keep `0.0.0.0/0` for full tunnel — the proxy handles the split):
+
+```ini
+[Interface]
+Address = 192.168.111.2/24
+PrivateKey = <private-key>
+DNS = 1.1.1.1
+
+[Peer]
+PublicKey = <server-public-key>
+Endpoint = vpn.do.wbitt.com:51820
+AllowedIPs = 0.0.0.0/0        # All traffic through tunnel
+PersistentKeepalive = 25
+```
+
+**Step 3 — Use the proxy for the sensitive service only**
+
+**Firefox** — Settings → Network Settings → Configure proxy → **Manual proxy configuration**:
+- SOCKS Host: `192.168.111.1` (the WG server IP)
+- Port: `1080`
+- Check **Proxy DNS when using SOCKS v5**
+- Set **No proxy for**: everything except the sensitive domain
+
+**Chrome / Edge** — Use a **PAC file** or extension (e.g. SwitchyOmega):
+```javascript
+function FindProxyForURL(url, host) {
+  if (dnsDomainIs(host, "sensitive-service.com"))
+    return "SOCKS5 192.168.111.1:1080";
+  return "DIRECT";
+}
+```
+
+**How it works**:
+- The VPN tunnel is always active (all traffic routes through it).
+- Only browser requests to the sensitive domain are forwarded to the SOCKS5 proxy.
+- If the VPN drops, the proxy IP (`192.168.111.1`) becomes unreachable — the service cannot be reached.
+- All other traffic works normally through the browser or other apps.
 
 ## 10. Next Steps
 

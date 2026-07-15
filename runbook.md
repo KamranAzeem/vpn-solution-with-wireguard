@@ -307,13 +307,30 @@ sysctl net.ipv4.ip_forward
 
 If IP forwarding is off after reboot, make sure `/etc/sysctl.d/99-wireguard.conf` exists and is loaded.
 
-### Kill switch blocking all traffic
+### Proxy is unreachable
 
 | Possible cause | Check / Fix |
 |----------------|-------------|
-| Tunnel down but kill switch rules active | Check `wg show` — if no handshake, reconnect the tunnel. The rules self-clean on `wg-quick down`. |
-| Rules applied before tunnel ready | Verify `PostUp` in the client config has the correct `%i` matching the interface name (`wg-client`, not `wg0`). |
-| Can't reach anything even with VPN up | Temporarily check by removing kill switch lines, reconnect, then re-add. |
+| VPN tunnel is down | Run `wg show` — no handshake means the proxy IP is unreachable. Reconnect the tunnel. |
+| danted service not running | `ssh root@<your-vps> systemctl status danted` |
+| Firewall blocking port 1080 | `iptables -L INPUT -v` on the server — confirm `tcp dpt:1080` is ACCEPT on `wg0` |
+| Wrong proxy IP | The SOCKS proxy IP must be the WG server tunnel IP (`192.168.111.1`), not the public IP |
+
+### Sensitive service still accessible outside the tunnel (Option A — static IP)
+
+| Possible cause | Check / Fix |
+|----------------|-------------|
+| `AllowedIPs` still set to `0.0.0.0/0` | Change it to the specific IP range of the service |
+| iptables rules not applied | Run `iptables -L OUTPUT -v` — check for REJECT rules on the service IP range |
+| Interface name mismatch | Verify `%i` in PostUp matches the actual interface name (e.g. `wg-client`) |
+
+### Sensitive service still accessible outside the tunnel (Option B — proxy)
+
+| Possible cause | Check / Fix |
+|----------------|-------------|
+| Browser not using the proxy | Check browser proxy settings — must be `SOCKS5 192.168.111.1:1080` |
+| PAC file not loaded | If using PAC, verify the file is accessible and the domain matches the rule |
+| DNS not proxied | Check **Proxy DNS when using SOCKS v5** in browser settings |
 
 ### Cannot SSH after firewall change
 
