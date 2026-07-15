@@ -6,7 +6,8 @@ A complete, reproducible guide to deploying a WireGuard VPN server on DigitalOce
 
 1. [Overview](#overview)
 2. [Prerequisites](#prerequisites)
-3. [Provision the VPS](#1-provision-the-vps)
+3. [Cloud Firewall / Security Group](#cloud-firewall--security-group-configuration)
+4. [Provision the VPS](#1-provision-the-vps)
 4. [Server Setup](#2-server-setup)
 5. [Naming Convention](#3-naming-convention)
 6. [Add Your First Client](#4-add-your-first-client)
@@ -42,11 +43,33 @@ A complete, reproducible guide to deploying a WireGuard VPN server on DigitalOce
 | OS | Fedora 40+ or Ubuntu 22.04+ (this guide uses Fedora) |
 | Domain (optional) | A DNS A record pointing to your VPS IP (easier than remembering an IP) |
 | SSH key | For server access. Password auth is disabled. |
-| Port | UDP 51820 must be open on the VPS firewall |
+| Port | UDP 51820 must be open on the cloud firewall / security group |
+| firewalld | Must be disabled (conflicts with iptables NAT rules used by WireGuard) |
+| SELinux | Must be permissive or disabled (Enforcing can block PostUp/PostDown iptables calls) |
 
 ---
 
-## 1. Provision the VPS
+## Cloud Firewall / Security Group Configuration
+
+Before the VPN can work, your cloud provider must allow UDP 51820 traffic to the VPS.
+
+| Provider | Resource | Inbound Rules |
+|----------|----------|---------------|
+| DigitalOcean | Cloud Firewall | UDP 51820 from `0.0.0.0/0`, TCP 22 from your IP only |
+| AWS | Security Group | Same — attach to the EC2 instance |
+| Azure | NSG (Network Security Group) | Same — associate with the VM subnet or NIC |
+| Hetzner | Firewall | Same — apply to the server |
+| Any VPS | OS-level firewall | Not needed if using cloud firewall (see notes below) |
+
+**Notes**:
+
+- The cloud firewall is the **first line of defense**. It filters traffic before it reaches the OS.
+- WireGuard uses iptables rules for NAT (masquerading) via PostUp/PostDown in wg0.conf.
+- **firewalld** should be disabled — it manages nftables rules that can conflict with iptables.
+- **SELinux Enforcing** can block PostUp/PostDown from executing iptables commands. Set it to permissive.
+- If you rely solely on a cloud firewall, no host-level firewall is needed.
+
+---
 
 ### 1a. Create a Droplet (DigitalOcean)
 

@@ -41,15 +41,71 @@ if [[ -f "${WG_DIR}/server.key" ]]; then
   fi
 fi
 
-# Install dependencies
-echo "=== Installing dependencies ==="
+# Check required packages
+echo "=== Checking required packages ==="
+PKG_OK=true
+
 if command -v dnf &>/dev/null; then
-  dnf install -y wireguard-tools iptables-nft jq
+  for pkg in wireguard-tools iptables-nft jq; do
+    if ! rpm -q "$pkg" &>/dev/null; then
+      echo "  MISSING: ${pkg}"
+      PKG_OK=false
+    else
+      echo "  OK:      ${pkg}"
+    fi
+  done
+  INSTALL_CMD="dnf install -y wireguard-tools iptables-nft jq"
 elif command -v apt &>/dev/null; then
-  apt update && apt install -y wireguard iptables jq
+  for pkg in wireguard iptables jq; do
+    if ! dpkg -s "$pkg" &>/dev/null 2>&1; then
+      echo "  MISSING: ${pkg}"
+      PKG_OK=false
+    else
+      echo "  OK:      ${pkg}"
+    fi
+  done
+  INSTALL_CMD="apt update && apt install -y wireguard iptables jq"
 else
-  echo "Error: unsupported package manager."
+  echo "  UNSUPPORTED: package manager not recognized."
+  echo "  Install wireguard-tools, iptables, and jq manually."
   exit 1
+fi
+
+if ! $PKG_OK; then
+  echo ""
+  echo "Install missing packages, then re-run this script:"
+  echo "  ${INSTALL_CMD}"
+  exit 1
+fi
+
+# Check for conflicting services
+echo ""
+echo "=== Checking for conflicting services ==="
+
+if command -v firewall-cmd &>/dev/null && firewall-cmd --state &>/dev/null 2>&1; then
+  echo "  WARNING: firewalld is ACTIVE"
+  echo "  WireGuard uses iptables for NAT (PostUp/PostDown)."
+  echo "  Running firewalld alongside iptables can cause conflicting rules."
+  echo "  Recommended: systemctl disable --now firewalld"
+  echo ""
+else
+  echo "  OK: firewalld is not active"
+fi
+
+if command -v getenforce &>/dev/null; then
+  SELINUX_STATE=$(getenforce)
+  if [[ "$SELINUX_STATE" == "Enforcing" ]]; then
+    echo "  WARNING: SELinux is ENFORCING"
+    echo "  WireGuard PostUp/PostDown calls iptables for NAT rules."
+    echo "  SELinux can block these exec calls, causing the tunnel to fail."
+    echo "  Recommended: setenforce 0"
+    echo "  And set SELINUX=permissive in /etc/selinux/config"
+    echo ""
+  else
+    echo "  OK: SELinux is ${SELINUX_STATE}"
+  fi
+else
+  echo "  OK: SELinux not present"
 fi
 
 # Create target directories (no scripts copied — repo stays outside WG_DIR)

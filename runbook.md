@@ -81,6 +81,13 @@ journalctl -u wg-quick@wg0 -f
 
 These steps bootstrap a bare VPS. The repo stays at `/root/vpn-solution/` — nothing is copied into `/etc/wireguard/` except runtime data (keys, config, DB).
 
+**Important**: Before running the setup script, ensure:
+- **firewalld is disabled**: `systemctl disable --now firewalld`
+- **SELinux is permissive**: `setenforce 0` and edit `/etc/selinux/config` → `SELINUX=permissive`
+- Required packages are installed: `wireguard-tools`, `iptables-nft`/`iptables`, `jq`
+
+The setup script will verify these and refuse to proceed if packages are missing, but it will only warn about firewalld/SELinux.
+
 ### 1. Clone the repo on the server
 
 ```bash
@@ -109,14 +116,17 @@ Set at minimum: `WG_INTERFACE` (run `ip route` on the VPS to find it), `WG_ENDPO
 
 The script will:
 
-1. Install `wireguard-tools`, `iptables-nft`, and `jq`
-2. Create `clients/` and `archive/` inside `WG_DIR` (default: `/etc/wireguard/`)
-3. Generate the IP allocation DB from the subnet in `vpn.conf`
-4. Generate server keys
-5. Write `wg0.conf`
-6. Enable IP forwarding
-7. Open the firewall port (if firewalld is active)
-8. Start WireGuard
+1. Check that `wireguard-tools`, `iptables-nft`/`iptables`, and `jq` are installed
+2. Check that firewalld is not active (it conflicts with iptables NAT rules)
+3. Check that SELinux is not enforcing (it can block PostUp/PostDown iptables calls)
+4. Create `clients/` and `archive/` inside `WG_DIR` (default: `/etc/wireguard/`)
+5. Generate the IP allocation DB from the subnet in `vpn.conf`
+6. Generate server keys
+7. Write `wg0.conf`
+8. Enable IP forwarding
+9. Start WireGuard
+
+If any required package is missing, the script prints the install command and exits. If firewalld or SELinux are active, it warns with the recommended fix command.
 
 ### 4. Verify
 

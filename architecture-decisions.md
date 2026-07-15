@@ -54,9 +54,17 @@ This keeps `/etc/wireguard/` clean. The main directory only contains server keys
 
 The `.conf` file contains the private key in plaintext. Sending it over email exposes the key. GPG symmetric encryption (`--symmetric --cipher-algo AES256`) encrypts the file before transmission. The decryption password is shared out of band (phone, Signal). The `email-config.sh` script automates this workflow.
 
-## Why No Host Firewall
+## Why firewalld and SELinux Are Disabled
 
-The VPS is behind DigitalOcean's Cloud Firewall, which handles network-level filtering (UDP 51820, SSH from trusted IPs). Adding a host firewall (firewalld, ufw) adds complexity and a potential point of failure. WireGuard's own iptables rules for NAT are managed through wg-quick PostUp/PostDown and are sufficient. The operator explicitly requested no firewalld or SELinux.
+**firewalld** manages nftables rulesets. WireGuard uses iptables for NAT (PostUp/PostDown in wg0.conf). Running both firewalld and iptables simultaneously can cause conflicting rules — a firewalld reload can overwrite or clear the iptables NAT rules that WireGuard depends on, silently breaking the tunnel. Since the cloud firewall handles network-level filtering, a host firewall adds complexity without benefit. The operator explicitly requested no firewalld.
+
+**SELinux** in Enforcing mode does not block WireGuard's kernel module directly. However, it can block the PostUp/PostDown iptables commands that wg-quick executes. Specifically:
+
+- `wg-quick` calls iptables as a regular process to add NAT and forwarding rules.
+- SELinux Enforcing with default targeted policy may deny these exec calls depending on the process context.
+- This manifests as a tunnel that comes up (wg0 interface exists) but clients have no internet — the NAT rules were silently rejected.
+
+Setting SELinux to permissive avoids this without fully disabling SELinux — it still logs denials but allows the operation. The operator explicitly requested no SELinux enforcement.
 
 ## Why IP Allocation DB is Managed via JSON (Not `wg show`)
 
