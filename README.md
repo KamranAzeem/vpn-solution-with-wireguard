@@ -14,8 +14,9 @@ A complete, reproducible guide to deploying a WireGuard VPN server on DigitalOce
 8. [Verify It Works](#6-verify-it-works)
 9. [Disable IPv6](#7-disable-ipv6-on-the-client)
 10. [Verify No Leaks](#8-verify-no-leaks)
-11. [Next Steps](#9-next-steps)
-12. [Server IPv6 (Optional)](#10-server-ipv6-optional)
+11. [Kill Switch](#9-kill-switch)
+12. [Next Steps](#10-next-steps)
+13. [Server IPv6 (Optional)](#11-server-ipv6-optional)
 
 ---
 
@@ -475,17 +476,62 @@ For day-to-day operations (adding/removing clients, troubleshooting, key rotatio
 
 ---
 
-## 9. Next Steps
+## 9. Kill Switch
+
+A kill switch blocks all non-VPN traffic if the tunnel drops. Without one, a brief disconnect can expose your real IP to the service you are accessing. This protects sensitive accounts from being terminated.
+
+### Linux (iptables)
+
+Add these lines to the client config under `[Interface]` (before the `[Peer]` section):
+
+```ini
+PostUp = iptables -I OUTPUT ! -o %i -m mark ! --mark $(wg show %i fwmark) -j REJECT
+PreDown = iptables -D OUTPUT ! -o %i -m mark ! --mark $(wg show %i fwmark) -j REJECT
+```
+
+`%i` is automatically replaced by `wg-quick` with your interface name (e.g. `wg-client`). These rules reject any outbound packet that is not going through the tunnel or carrying the tunnel's firewall mark.
+
+To verify the rules are active:
+
+```bash
+sudo iptables -L OUTPUT -v
+# Look for REJECT rules referencing wg-client
+```
+
+### Windows
+
+1. Open the WireGuard app
+2. Select your tunnel → **Edit**
+3. Check **Block untunneled traffic (kill-switch)**
+4. Click **Save** and **Activate**
+
+### macOS
+
+1. Open the WireGuard app
+2. Select your tunnel → **Settings** (gear icon)
+3. Check **Block untunneled traffic (kill-switch)**
+4. Click **Save** and **Activate**
+
+### iOS / Android
+
+1. Open the WireGuard app
+2. Tap the tunnel name → **Edit**
+3. Toggle **On-Demand** to **On**
+4. Toggle **Block untunneled traffic (kill-switch)**
+5. Tap **Save** → **Activate**
+
+## 10. Next Steps
 
 - [ ] Disable IPv6 on the client (section 7)
 - [ ] Verify no leaks (section 8)
+- [ ] Enable kill switch (section 9)
 - [ ] Add more clients (repeat section 4 for each user)
 - [ ] Restrict the cloud firewall to specific source IP ranges
 - [ ] Set up server monitoring (ping, `wg show` cron job)
 - [ ] Schedule regular OS updates
 - [ ] Back up `/etc/wireguard/` off-server
 
-## 10. Server IPv6 (Optional)
+## 11. Server IPv6 (Optional)
 
 The server runs IPv4 only by default. If you need to route IPv6 through the tunnel:
 

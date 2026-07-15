@@ -307,6 +307,14 @@ sysctl net.ipv4.ip_forward
 
 If IP forwarding is off after reboot, make sure `/etc/sysctl.d/99-wireguard.conf` exists and is loaded.
 
+### Kill switch blocking all traffic
+
+| Possible cause | Check / Fix |
+|----------------|-------------|
+| Tunnel down but kill switch rules active | Check `wg show` — if no handshake, reconnect the tunnel. The rules self-clean on `wg-quick down`. |
+| Rules applied before tunnel ready | Verify `PostUp` in the client config has the correct `%i` matching the interface name (`wg-client`, not `wg0`). |
+| Can't reach anything even with VPN up | Temporarily check by removing kill switch lines, reconnect, then re-add. |
+
 ### Cannot SSH after firewall change
 
 Use DigitalOcean's Recovery Console (in the web UI) to fix the firewall rules. Always keep the recovery console as a fallback.
