@@ -2,14 +2,20 @@
 set -euo pipefail
 
 WG_DIR="/etc/wireguard"
+CONFIG="${WG_DIR}/vpn.conf"
 CLIENTS_DIR="${WG_DIR}/clients"
 DB="${WG_DIR}/ip-allocations.json"
-FROM_EMAIL=$(jq -r '.from_email // "vpn-admin@example.com"' "$DB")
+
+if [[ -f "$CONFIG" ]]; then
+  source "$CONFIG"
+fi
+
+FROM_EMAIL="${FROM_EMAIL:-vpn-admin@example.com}"
 
 usage() {
   echo "Usage: $0 --name <client-name> --email <recipient-email>"
   echo ""
-  echo "  --name   Full client name (e.g. kamran-wbitt-com-laptop-office)"
+  echo "  --name   Full client name"
   echo "  --email  Recipient's email address"
   echo ""
   echo "Prerequisites:"
@@ -19,20 +25,17 @@ usage() {
   echo "       host smtp.gmail.com"
   echo "       port 587"
   echo "       auth on"
-  echo "       from <your-email>@gmail.com"
-  echo "       user <your-email>@gmail.com"
+  echo "       from ${FROM_EMAIL}"
+  echo "       user ${FROM_EMAIL}"
   echo "       password <app-password>"
   echo "       tls on"
   echo "       tls_starttls on"
   echo "       logfile /var/log/msmtp.log"
-  echo "  3. Generate a Gmail App Password at:"
-  echo "     https://myaccount.google.com/apppasswords"
+  echo "  3. App Password: https://myaccount.google.com/apppasswords"
   exit 1
 }
 
-CLIENT_NAME=""
-RECIPIENT=""
-
+CLIENT_NAME=""; RECIPIENT=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --name)  CLIENT_NAME="$2"; shift 2 ;;
@@ -46,23 +49,20 @@ if [[ -z "$CLIENT_NAME" || -z "$RECIPIENT" ]]; then
   usage
 fi
 
-CONFIG="${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.conf"
+CONFIG_FILE="${CLIENTS_DIR}/${CLIENT_NAME}/${CLIENT_NAME}.conf"
 
-if [[ ! -f "$CONFIG" ]]; then
-  echo "Error: config not found at ${CONFIG}"
+if [[ ! -f "$CONFIG_FILE" ]]; then
+  echo "Error: config not found at ${CONFIG_FILE}"
   exit 1
 fi
 
-# Prompt for encryption password
-echo -n "Enter encryption password (will be shared out of band): "
+echo -n "Encryption password (share out of band): "
 read -s ENC_PASS
 echo ""
 
-# Encrypt the config
-gpg --batch --yes --passphrase "$ENC_PASS" --symmetric --cipher-algo AES256 "$CONFIG"
+gpg --batch --yes --passphrase "$ENC_PASS" --symmetric --cipher-algo AES256 "$CONFIG_FILE"
 
-# Send email
-ENCRYPTED_FILE="${CONFIG}.gpg"
+ENCRYPTED_FILE="${CONFIG_FILE}.gpg"
 SUBJECT="WireGuard VPN Config — ${CLIENT_NAME}"
 BODY="Hi,
 
@@ -73,37 +73,34 @@ To import:
   2. Open the app and import the attached .conf file
   3. Activate the tunnel
 
-Server endpoint: $(jq -r '.endpoint // "vpn.do.wbitt.com"' "$DB"):51820
+Server endpoint: ${WG_ENDPOINT:-vpn.do.wbitt.com}:${WG_PORT:-51820}
 Your IP: $(jq -r --arg n "$CLIENT_NAME" '.allocations | to_entries[] | select(.value == $n) | .key' "$DB")
 
-The decryption password was shared with you separately.
-
-This is an automated message from the VPN server."
+The decryption password was shared with you separately."
 
 {
   echo "From: WireGuard VPN <${FROM_EMAIL}>"
   echo "To: ${RECIPIENT}"
   echo "Subject: ${SUBJECT}"
   echo "MIME-Version: 1.0"
-  echo "Content-Type: multipart/mixed; boundary=\"==BOUNDARY_$(date +%s)\""
+  echo "Content-Type: multipart/mixed; boundary=\"==BOUND_$(date +%s)\""
   echo ""
-  echo "--==BOUNDARY_$(date +%s)"
+  echo "--==BOUND_$(date +%s)"
   echo "Content-Type: text/plain; charset=utf-8"
   echo ""
   echo "${BODY}"
   echo ""
-  echo "--==BOUNDARY_$(date +%s)"
+  echo "--==BOUND_$(date +%s)"
   echo "Content-Type: application/octet-stream; name=\"${CLIENT_NAME}.conf.gpg\""
   echo "Content-Disposition: attachment; filename=\"${CLIENT_NAME}.conf.gpg\""
   echo "Content-Transfer-Encoding: base64"
   echo ""
   base64 "$ENCRYPTED_FILE"
   echo ""
-  echo "--==BOUNDARY_$(date +%s)--"
+  echo "--==BOUND_$(date +%s)--"
 } | msmtp --account=gmail -t
 
 echo ""
 echo "=== Email sent to ${RECIPIENT} ==="
-echo "  Config: ${CLIENT_NAME}.conf (encrypted)"
-echo ""
-echo "Share the decryption password out of band (phone, Signal)."
+echo "  Config: ${CLIENT_NAME}.conf.gpg"
+echo "Share the password out of band."

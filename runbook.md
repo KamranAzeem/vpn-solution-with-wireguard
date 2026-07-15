@@ -6,6 +6,7 @@ Day-to-day commands for running, maintaining, and troubleshooting a WireGuard VP
 
 - [Status Checks](#status-checks)
 - [Directory Structure](#directory-structure)
+- [Initial Setup (New Server)](#initial-setup-new-server)
 - [Deploying Scripts to the Server](#deploying-scripts-to-the-server)
 - [Adding a Client](#adding-a-client)
 - [Removing a Client](#removing-a-client)
@@ -51,7 +52,8 @@ journalctl -u wg-quick@wg0 -f
 ├── server.key                  # Server private key
 ├── server.key.pub              # Server public key
 ├── wg0.conf                    # Server config with all [Peer] sections
-├── ip-allocations.json         # IP allocation database
+├── ip-allocations.json         # IP allocation database (runtime only)
+├── vpn.conf                    # Static config (deployed by initial-setup.sh)
 ├── clients/                    # Per-client directories
 │   └── <client-name>/
 │       ├── client.key
@@ -59,11 +61,66 @@ journalctl -u wg-quick@wg0 -f
 │       └── <client-name>.conf
 ├── archive/                    # Deleted clients moved here
 └── support-files/              # Helper scripts (deployed from git)
+    ├── initial-setup.sh        # One-shot server bootstrap
     ├── add-client.sh
     ├── delete-client.sh
     ├── rotate-server-key.sh
     └── email-config.sh
 ```
+
+---
+
+## Initial Setup (New Server)
+
+These steps bootstrap a bare VPS into a running WireGuard VPN.
+
+### 1. Configure
+
+Edit `vpn.conf` in the repo with your server's details:
+
+```bash
+# From your local machine
+cd vpn-solution
+nano vpn.conf
+```
+
+Set the subnet, network interface (run `ip route` on the VPS to find it), endpoint hostname, and sender email.
+
+### 2. Run initial setup
+
+Copy the entire `vpn-solution` directory to the VPS and run the setup script:
+
+```bash
+scp -r vpn-solution root@<your-vps>:/root/
+ssh root@<your-vps>
+cd /root/vpn-solution
+chmod +x support-files/initial-setup.sh
+./support-files/initial-setup.sh
+```
+
+The script will:
+
+1. Install `wireguard-tools`, `iptables-nft`, and `jq`
+2. Copy scripts and config to `/etc/wireguard/`
+3. Generate the IP allocation DB from the subnet in `vpn.conf`
+4. Generate server keys
+5. Write `wg0.conf`
+6. Enable IP forwarding
+7. Open the firewall port (if firewalld is active)
+8. Start WireGuard
+
+### 3. Verify
+
+```bash
+wg show
+```
+
+You should see the interface with your server public key and no peers yet.
+
+### 4. Configure DigitalOcean Cloud Firewall
+
+- Inbound: UDP 51820 from `0.0.0.0/0`
+- Inbound: TCP 22 from your IP only
 
 ---
 

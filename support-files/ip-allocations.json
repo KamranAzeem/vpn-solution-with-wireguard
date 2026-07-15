@@ -1,10 +1,6 @@
 {
   "pool": "192.168.111.0/24",
   "server": "192.168.111.1",
-  "interface": "ens3",
-  "endpoint": "vpn.do.wbitt.com",
-  "dns": "1.1.1.1",
-  "from_email": "vpn-admin@example.com",
   "allocations": {
     "192.168.111.1": "server",
     "192.168.111.2": null,
