@@ -5,8 +5,11 @@ Day-to-day commands for running, maintaining, and troubleshooting a WireGuard VP
 ## Contents
 
 - [Status Checks](#status-checks)
+- [Directory Structure](#directory-structure)
+- [Deploying Scripts to the Server](#deploying-scripts-to-the-server)
 - [Adding a Client](#adding-a-client)
 - [Removing a Client](#removing-a-client)
+- [Delivering a Config](#delivering-a-config)
 - [Restarting WireGuard](#restarting-wireguard)
 - [Updating the Server](#updating-the-server)
 - [Rotating the Server Key](#rotating-the-server-key)
@@ -40,111 +43,74 @@ journalctl -u wg-quick@wg0 -f
 
 ---
 
-## Adding a Client
+## Directory Structure
 
-### 1. Collect user info
-
-Get the end-user's **email**, **device type** (`laptop`, `desktop`, `phone`, `tablet`, `server`), and a short **alias** describing the device (e.g. office, personal, linux, home). Each device needs its own config — sharing one config across devices causes connection conflicts.
-
-### 2. Generate keypair on the server
-
-```bash
-ssh root@<your-vps>
-
-cd /etc/wireguard
-umask 077
-
-email_to_name() {
-  echo "$1" | tr '@.' '-' | tr -s '-'
-}
-
-EMAIL="user@example.com"                   # The end-user's email
-DEVICE="laptop"                            # Device type
-ALIAS="office"                             # Device alias
-CLIENT_NAME="$(email_to_name "${EMAIL}")-${DEVICE}-${ALIAS}"
-
-wg genkey | tee "${CLIENT_NAME}.key" | wg pubkey > "${CLIENT_NAME}.key.pub"
 ```
-
-**Example**: `user@example.com` + `laptop` + `office` → `user-example-com-laptop-office`
-
-### 3. Find the next available IP
-
-```bash
-wg show
-# Peers use 10.0.0.2, 10.0.0.3, ... — pick the next one
+/etc/wireguard/
+├── server.key                  # Server private key
+├── server.key.pub              # Server public key
+├── wg0.conf                    # Server config with all [Peer] sections
+├── ip-allocations.json         # IP allocation database
+├── clients/                    # Per-client directories
+│   └── <client-name>/
+│       ├── client.key
+│       ├── client.key.pub
+│       └── <client-name>.conf
+├── archive/                    # Deleted clients moved here
+└── support-files/              # Helper scripts (deployed from git)
+    ├── add-client.sh
+    ├── delete-client.sh
+    ├── rotate-server-key.sh
+    └── email-config.sh
 ```
-
-### 4. Add the peer
-
-```bash
-NEXT_IP=10.0.0.3                           # Adjust
-CLIENT_PUB=$(cat "${CLIENT_NAME}.key.pub")
-wg set wg0 peer "${CLIENT_PUB}" allowed-ips "${NEXT_IP}/32"
-wg-quick save wg0
-```
-
-### 5. Create the client config
-
-```bash
-SERVER_PUB=$(cat /etc/wireguard/server.key.pub)
-
-cat > "${CLIENT_NAME}.conf" << EOF
-[Interface]
-Address = ${NEXT_IP}/24
-PrivateKey = $(cat "${CLIENT_NAME}.key")
-DNS = 1.1.1.1
-
-[Peer]
-PublicKey = ${SERVER_PUB}
-Endpoint = <your-vps-ip-or-hostname>:51820
-AllowedIPs = 0.0.0.0/0
-PersistentKeepalive = 25
-EOF
-```
-
-### 6. Deliver the config securely
-
-**Security warning**: The `.conf` file contains the private key in plaintext. Do NOT send it over unencrypted channels (plain email, Slack, WhatsApp).
-
-**Option A — Encrypted email (recommended for remote users):**
-```bash
-gpg --symmetric --cipher-algo AES256 "${CLIENT_NAME}.conf"
-# Sends "${CLIENT_NAME}.conf.gpg"
-```
-Send the `.gpg` file via email. Share the decryption password out of band (phone call, Signal).
-
-**Option B — SCP then direct transfer (admin mediates):**
-```bash
-mkdir -p ~/vpn-clients
-scp root@<your-vps>:"/etc/wireguard/${CLIENT_NAME}.conf" ~/vpn-clients/
-```
-Hand the file to the user via USB, encrypted chat, or direct transfer.
-
-**Option C — QR code (mobile only, no file transfer needed):**
-```bash
-qrencode -t ansiutf8 < "${CLIENT_NAME}.conf"
-```
-The user scans the QR code directly in the WireGuard mobile app.
 
 ---
 
-## Removing a Client
+## Deploying Scripts to the Server
+
+```bash
+# From your local machine
+cd vpn-solution
+scp -r support-files root@<your-vps>:/etc/wireguard/support-files/
+chmod +x /etc/wireguard/support-files/*.sh
+```
+
+After deploy, create the `clients` and `archive` directories:
 
 ```bash
 ssh root@<your-vps>
-
-# Remove the peer
-wg set wg0 peer <client-public-key> remove
-wg-quick save wg0
-
-# Delete their key files (optional)
-rm /etc/wireguard/<name-from-email>-<device>-<alias>.key
-rm /etc/wireguard/<name-from-email>-<device>-<alias>.key.pub
-rm /etc/wireguard/<name-from-email>-<device>-<alias>.conf
+mkdir -p /etc/wireguard/{clients,archive}
 ```
 
-**Removing all devices for a user**: repeat for each device+alias combination they had.
+---
+
+## Adding a Client
+
+SSH to the server and run:
+
+```bash
+ssh root@<your-vps>
+/etc/wireguard/support-files/add-client.sh \
+  --email user@example.com \
+  --device laptop \
+  --alias office
+```
+
+The script:
+1. Generates the client name from email-device-alias (e.g. `user-example-com-laptop-office`)
+2. Finds the first available IP from `ip-allocations.json`
+3. Generates a WireGuard keypair in `clients/<name>/`
+4. Creates the client config file
+5. Adds the peer to the running WireGuard interface
+6. Saves the config and updates the IP DB
+
+**Example output:**
+```
+=== Adding client: user-example-com-laptop-office ===
+Allocated IP: 192.168.111.2
+  Config:     /etc/wireguard/clients/user-example-com-laptop-office/user-example-com-laptop-office.conf
+  Public key: <base64-key>
+```
 
 ---
 
@@ -183,32 +149,21 @@ wg show
 
 ## Rotating the Server Key
 
-Do this if the server private key is compromised, or periodically as a security measure.
+Do this if the server private key is compromised, or periodically as a security measure. The script handles everything:
 
-1. Generate a new keypair:
-   ```bash
-   cd /etc/wireguard
-   umask 077
-   wg genkey | tee server.key | wg pubkey > server.key.pub
-   ```
+```
+ssh root@<your-vps>
+/etc/wireguard/support-files/rotate-server-key.sh
+```
 
-2. Regenerate the server config with the new private key:
-   ```bash
-   # Use the same PostUp/PostDown and Address as your original config
-   # Replace PrivateKey line with: PrivateKey = $(cat server.key)
-   ```
+What it does:
+1. Backs up the existing server keys
+2. Generates a new server keypair
+3. Rewrites `wg0.conf` with the new private key
+4. Regenerates all client configs in `clients/<name>/` with the new server public key
+5. Restarts WireGuard
 
-3. Restart WireGuard:
-   ```bash
-   systemctl restart wg-quick@wg0
-   ```
-
-4. Send every client the **new server public key**:
-   ```bash
-   cat /etc/wireguard/server.key.pub
-   ```
-
-5. Each client must update their config's `[Peer] PublicKey` to the new value.
+**After rotation**: every client must reimport their config. The new server public key is displayed at the end of the script.
 
 ---
 

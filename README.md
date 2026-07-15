@@ -474,7 +474,7 @@ Overhead is minimal — the VPN is suitable for browsing, streaming, and general
 
 ---
 
-For day-to-day operations (adding/removing clients, troubleshooting, key rotation), see [runbook.md](runbook.md).
+For day-to-day operations (adding/removing clients, troubleshooting, key rotation), see [runbook.md](runbook.md). Helper scripts are available in `support-files/` and can be deployed to the server — see the runbook for instructions.
 
 ---
 
