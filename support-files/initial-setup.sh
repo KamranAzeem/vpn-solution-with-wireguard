@@ -1,37 +1,38 @@
 #!/usr/bin/env bash
 # initial-setup.sh — Bootstrap a WireGuard VPN server from scratch
+# Runs from the repo directory. Creates runtime data in WG_DIR only.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
-
-# Source the config file
 CONFIG="${REPO_DIR}/vpn.conf"
+
 if [[ ! -f "$CONFIG" ]]; then
-  echo "Error: ${CONFIG} not found. Copy vpn.conf from the repo and edit it first."
+  echo "Error: ${CONFIG} not found. Edit vpn.conf first."
   exit 1
 fi
 source "$CONFIG"
 
+WG_DIR="${WG_DIR:-/etc/wireguard}"
+
 echo "=== WireGuard VPN Initial Setup ==="
+echo "Repo:        ${REPO_DIR}"
 echo "Config:      ${CONFIG}"
+echo "Target dir:  ${WG_DIR}"
 echo "Subnet:      ${WG_SUBNET}"
 echo "Server IP:   ${WG_SERVER_IP}"
 echo "Interface:   ${WG_INTERFACE}"
 echo "Endpoint:    ${WG_ENDPOINT}:${WG_PORT}"
 echo ""
 
-# Validate config
 if [[ -z "$WG_SUBNET" || -z "$WG_SERVER_IP" || -z "$WG_INTERFACE" || -z "$WG_ENDPOINT" ]]; then
   echo "Error: Required config variables are missing. Check vpn.conf."
   exit 1
 fi
 
-# Check if already initialized
-if [[ -f /etc/wireguard/server.key ]]; then
-  echo "Warning: /etc/wireguard/server.key already exists."
-  echo "This server appears to already be set up."
-  echo "Run rotate-server-key.sh if you want to regenerate keys."
+if [[ -f "${WG_DIR}/server.key" ]]; then
+  echo "Warning: ${WG_DIR}/server.key already exists."
+  echo "Run rotate-server-key.sh to regenerate."
   echo ""
   read -rp "Continue anyway? (y/N): " CONFIRM
   if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
@@ -47,19 +48,12 @@ if command -v dnf &>/dev/null; then
 elif command -v apt &>/dev/null; then
   apt update && apt install -y wireguard iptables jq
 else
-  echo "Error: unsupported package manager. Install wireguard-tools, iptables, and jq manually."
+  echo "Error: unsupported package manager."
   exit 1
 fi
 
-# Create directories
-mkdir -p /etc/wireguard/{clients,archive,support-files}
-
-# Copy support scripts
-cp "${SCRIPT_DIR}"/*.sh /etc/wireguard/support-files/
-chmod +x /etc/wireguard/support-files/*.sh
-
-# Copy config
-cp "$CONFIG" /etc/wireguard/vpn.conf
+# Create target directories (no scripts copied — repo stays outside WG_DIR)
+mkdir -p "${WG_DIR}"/{clients,archive}
 
 # Generate IP allocation DB
 echo "=== Generating IP allocation database ==="
@@ -81,7 +75,7 @@ db = {
     'allocations': allocations
 }
 
-with open('/etc/wireguard/ip-allocations.json', 'w') as f:
+with open('${WG_DIR}/ip-allocations.json', 'w') as f:
     json.dump(db, f, indent=2)
     f.write('\n')
 
@@ -91,7 +85,7 @@ print(f'Generated DB: {total} client IPs available')
 
 # Generate server keys
 echo "=== Generating server keys ==="
-cd /etc/wireguard
+cd "$WG_DIR"
 umask 077
 wg genkey | tee server.key | wg pubkey > server.key.pub
 SERVER_PUB=$(cat server.key.pub)
@@ -140,5 +134,5 @@ echo "Server public key: ${SERVER_PUB}"
 echo ""
 echo "Next steps:"
 echo "  1. Configure DigitalOcean Cloud Firewall (UDP ${WG_PORT})"
-echo "  2. Add clients: /etc/wireguard/support-files/add-client.sh"
-echo "  3. See runbook.md for operations"
+echo "  2. Add clients: ${SCRIPT_DIR}/add-client.sh"
+echo "  3. See runbook.md in ${REPO_DIR} for operations"

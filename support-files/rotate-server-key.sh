@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-WG_DIR="/etc/wireguard"
-CONFIG="${WG_DIR}/vpn.conf"
-CLIENTS_DIR="${WG_DIR}/clients"
-DB="${WG_DIR}/ip-allocations.json"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+CONFIG="${REPO_DIR}/vpn.conf"
 
 if [[ -f "$CONFIG" ]]; then
   source "$CONFIG"
+else
+  echo "Error: ${CONFIG} not found. Run from the vpn-solution repo."
+  exit 1
 fi
+
+WG_DIR="${WG_DIR:-/etc/wireguard}"
+CLIENTS_DIR="${WG_DIR}/clients"
+DB="${WG_DIR}/ip-allocations.json"
 
 echo "=== Rotating server key ==="
 echo "All client configs will be regenerated. Clients must reimport."

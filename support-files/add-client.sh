@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-WG_DIR="/etc/wireguard"
-CONFIG="${WG_DIR}/vpn.conf"
-CLIENTS_DIR="${WG_DIR}/clients"
-DB="${WG_DIR}/ip-allocations.json"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+CONFIG="${REPO_DIR}/vpn.conf"
 
 if [[ -f "$CONFIG" ]]; then
   source "$CONFIG"
+else
+  echo "Error: ${CONFIG} not found. Run from the vpn-solution repo."
+  exit 1
 fi
 
+WG_DIR="${WG_DIR:-/etc/wireguard}"
+CLIENTS_DIR="${WG_DIR}/clients"
+DB="${WG_DIR}/ip-allocations.json"
 SERVER_PUB=$(cat "${WG_DIR}/server.key.pub")
 
 email_to_name() {
@@ -106,4 +111,4 @@ echo ""
 echo "Deliver via:"
 echo "  SCP:  scp root@<vps>:${CLIENT_DIR}/${CLIENT_NAME}.conf ."
 echo "  QR:   qrencode -t ansiutf8 < ${CLIENT_DIR}/${CLIENT_NAME}.conf"
-echo "  Mail: support-files/email-config.sh --name ${CLIENT_NAME} --email ${EMAIL}"
+echo "  Mail: ${SCRIPT_DIR}/email-config.sh --name ${CLIENT_NAME} --email ${EMAIL}"

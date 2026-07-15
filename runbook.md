@@ -7,7 +7,7 @@ Day-to-day commands for running, maintaining, and troubleshooting a WireGuard VP
 - [Status Checks](#status-checks)
 - [Directory Structure](#directory-structure)
 - [Initial Setup (New Server)](#initial-setup-new-server)
-- [Deploying Scripts to the Server](#deploying-scripts-to-the-server)
+- [Running Scripts](#running-scripts)
 - [Adding a Client](#adding-a-client)
 - [Removing a Client](#removing-a-client)
 - [Delivering a Config](#delivering-a-config)
@@ -48,60 +48,69 @@ journalctl -u wg-quick@wg0 -f
 ## Directory Structure
 
 ```
-/etc/wireguard/
-├── server.key                  # Server private key
-├── server.key.pub              # Server public key
-├── wg0.conf                    # Server config with all [Peer] sections
-├── ip-allocations.json         # IP allocation database (runtime only)
-├── vpn.conf                    # Static config (deployed by initial-setup.sh)
-├── clients/                    # Per-client directories
-│   └── <client-name>/
-│       ├── client.key
-│       ├── client.key.pub
-│       └── <client-name>.conf
-├── archive/                    # Deleted clients moved here
-└── support-files/              # Helper scripts (deployed from git)
+# Repo (clones/pulled on the server, outside /etc/wireguard/)
+/root/vpn-solution/
+├── vpn.conf                    # Config — edit this before setup
+├── architecture-decisions.md   # Design rationale
+├── README.md                   # End-user guide
+├── runbook.md                  # Operations guide
+└── support-files/
     ├── initial-setup.sh        # One-shot server bootstrap
     ├── add-client.sh
     ├── delete-client.sh
     ├── rotate-server-key.sh
     └── email-config.sh
+
+# Runtime data (created by initial-setup.sh and scripts, inside WG_DIR)
+/etc/wireguard/
+├── server.key                  # Server private key
+├── server.key.pub              # Server public key
+├── wg0.conf                    # Server config with all [Peer] sections
+├── ip-allocations.json         # IP allocation database
+├── clients/                    # Per-client keypairs and configs
+│   └── <client-name>/
+│       ├── client.key
+│       ├── client.key.pub
+│       └── <client-name>.conf
+└── archive/                    # Deleted clients moved here
 ```
 
 ---
 
 ## Initial Setup (New Server)
 
-These steps bootstrap a bare VPS into a running WireGuard VPN.
+These steps bootstrap a bare VPS. The repo stays at `/root/vpn-solution/` — nothing is copied into `/etc/wireguard/` except runtime data (keys, config, DB).
 
-### 1. Configure
-
-Edit `vpn.conf` in the repo with your server's details:
+### 1. Clone the repo on the server
 
 ```bash
-# From your local machine
-cd vpn-solution
+ssh root@<your-vps>
+cd /root
+# Copy the repo (or git clone if hosted)
+scp -r <your-machine>:/path/to/vpn-solution /root/
+```
+
+### 2. Configure
+
+Edit `vpn.conf` with your server's details:
+
+```bash
+cd /root/vpn-solution
 nano vpn.conf
 ```
 
-Set the subnet, network interface (run `ip route` on the VPS to find it), endpoint hostname, and sender email.
+Set at minimum: `WG_INTERFACE` (run `ip route` on the VPS to find it), `WG_ENDPOINT` (your hostname or IP), and `FROM_EMAIL`.
 
-### 2. Run initial setup
-
-Copy the entire `vpn-solution` directory to the VPS and run the setup script:
+### 3. Run initial setup
 
 ```bash
-scp -r vpn-solution root@<your-vps>:/root/
-ssh root@<your-vps>
-cd /root/vpn-solution
-chmod +x support-files/initial-setup.sh
 ./support-files/initial-setup.sh
 ```
 
 The script will:
 
 1. Install `wireguard-tools`, `iptables-nft`, and `jq`
-2. Copy scripts and config to `/etc/wireguard/`
+2. Create `clients/` and `archive/` inside `WG_DIR` (default: `/etc/wireguard/`)
 3. Generate the IP allocation DB from the subnet in `vpn.conf`
 4. Generate server keys
 5. Write `wg0.conf`
@@ -109,58 +118,40 @@ The script will:
 7. Open the firewall port (if firewalld is active)
 8. Start WireGuard
 
-### 3. Verify
+### 4. Verify
 
 ```bash
 wg show
 ```
 
-You should see the interface with your server public key and no peers yet.
-
-### 4. Configure DigitalOcean Cloud Firewall
+### 5. Configure DigitalOcean Cloud Firewall
 
 - Inbound: UDP 51820 from `0.0.0.0/0`
 - Inbound: TCP 22 from your IP only
 
 ---
 
-## Deploying Scripts to the Server
+## Running Scripts
 
-### Prerequisites on the server
-
-```bash
-# Scripts require these tools
-dnf install -y jq qrencode
-
-# For email delivery (optional)
-dnf install -y msmtp
-```
-
-### Deploy
+All scripts live in the repo at `/root/vpn-solution/support-files/` and are run from there. They read `vpn.conf` (one directory up) to find `WG_DIR` and other settings.
 
 ```bash
-# From your local machine
-cd vpn-solution
-scp -r support-files root@<your-vps>:/etc/wireguard/support-files/
-chmod +x /etc/wireguard/support-files/*.sh
+cd /root/vpn-solution
+./support-files/add-client.sh ...
 ```
 
-After deploy, create the `clients` and `archive` directories:
-
-```bash
-ssh root@<your-vps>
-mkdir -p /etc/wireguard/{clients,archive}
-```
+Scripts require `jq` and `wg-quick` on the server. The email script additionally requires `msmtp` and a Gmail App Password.
 
 ---
 
 ## Adding a Client
 
-SSH to the server and run:
+SSH to the server and run the script from the repo:
 
 ```bash
 ssh root@<your-vps>
-/etc/wireguard/support-files/add-client.sh \
+cd /root/vpn-solution
+./support-files/add-client.sh \
   --email user@example.com \
   --device laptop \
   --alias office
@@ -181,6 +172,59 @@ Allocated IP: 192.168.111.2
   Config:     /etc/wireguard/clients/user-example-com-laptop-office/user-example-com-laptop-office.conf
   Public key: <base64-key>
 ```
+
+---
+
+## Removing a Client
+
+```bash
+ssh root@<your-vps>
+cd /root/vpn-solution
+./support-files/delete-client.sh --name user-example-com-laptop-office
+```
+
+To find the exact client name:
+
+```bash
+ls /etc/wireguard/clients/
+```
+
+The script removes the peer from WireGuard, frees the IP in the DB, and moves the client directory to `archive/`.
+
+---
+
+## Delivering a Config
+
+### Option A — Encrypted email (automatic)
+
+Requires msmtp configured with Gmail SMTP. See the script header for setup.
+
+```bash
+ssh root@<your-vps>
+cd /root/vpn-solution
+./support-files/email-config.sh \
+  --name user-example-com-laptop-office \
+  --email user@example.com
+```
+
+You will be prompted for an encryption password. The config is GPG-encrypted and emailed as an attachment. Share the password out of band.
+
+### Option B — SCP from server
+
+```bash
+# On your local machine
+mkdir -p ~/vpn-clients
+scp root@<your-vps>:/etc/wireguard/clients/user-example-com-laptop-office/user-example-com-laptop-office.conf ~/vpn-clients/
+```
+
+### Option C — QR code (mobile only)
+
+```bash
+ssh root@<your-vps>
+qrencode -t ansiutf8 < /etc/wireguard/clients/user-example-com-laptop-office/user-example-com-laptop-office.conf
+```
+
+**Security warning**: The `.conf` file contains the private key in plaintext. Never send it over unencrypted channels.
 
 ---
 
@@ -223,7 +267,7 @@ Do this if the server private key is compromised, or periodically as a security 
 
 ```
 ssh root@<your-vps>
-/etc/wireguard/support-files/rotate-server-key.sh
+/root/vpn-solution/support-files/rotate-server-key.sh
 ```
 
 What it does:
