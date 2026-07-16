@@ -1,6 +1,6 @@
 Salaam,
 
-Before you do anything, first check your current public IP assigned by your local ISP and write it down. After the VPN is active, this IP should no longer be visible to the websites on the internet — they will see the VPN server's IP instead.
+Attached is the config file for you to set up a VPN tunnel on your computer. Before you activate it, first check your current public IP assigned by your local ISP and write it down. After the VPN is active, this IP should no longer be visible to the websites on the internet — they will see the VPN server's IP instead.
 
 You can use:
 
