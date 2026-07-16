@@ -18,7 +18,7 @@ DB="${WG_DIR}/ip-allocations.json"
 SERVER_PUB=$(cat "${WG_DIR}/server.key.pub")
 
 email_to_name() {
-  echo "$1" | tr '@.' '-' | tr -s '-'
+  echo "$1" | sed 's/@/-at-/g; s/\./-dot-/g'
 }
 
 usage() {

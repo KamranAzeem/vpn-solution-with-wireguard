@@ -201,9 +201,9 @@ Each client is identified by email (flattened to kebab), device type, and alias.
 
 | Email | Device | Alias | Result |
 |-------|--------|-------|--------|
-| kamran@wbitt.com | laptop | office | `kamran-wbitt-com-laptop-office` |
-| kamran@wbitt.com | laptop | personal | `kamran-wbitt-com-laptop-personal` |
-| kamran@wbitt.com | phone | personal | `kamran-wbitt-com-phone-personal` |
+| kamran@wbitt.com | laptop | office | `kamran-at-wbitt-dot-com-laptop-office` |
+| kamran@wbitt.com | laptop | personal | `kamran-at-wbitt-dot-com-laptop-personal` |
+| kamran@wbitt.com | phone | personal | `kamran-at-wbitt-dot-com-phone-personal` |
 
 Alias allows multiple devices of the same type (office laptop, personal laptop, etc.).
 
@@ -211,11 +211,11 @@ Helper function:
 
 ```bash
 email_to_name() {
-  echo "$1" | tr '@.' '-' | tr -s '-'
+  echo "$1" | sed 's/@/-at-/g; s/\./-dot-/g'
 }
 ```
 
-Email `kamran@wbitt.com` → `kamran-wbitt-com`. Append `-<device>-<alias>`.
+Email `kamran@wbitt.com` → `kamran-at-wbitt-dot-com`. Append `-<device>-<alias>`.
 
 Supported device types: `laptop`, `desktop`, `phone`, `tablet`, `server`.
 
