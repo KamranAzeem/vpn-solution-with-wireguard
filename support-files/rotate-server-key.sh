@@ -28,6 +28,8 @@ WG_DIR="${WG_DIR:-/etc/wireguard}"
 CLIENTS_DIR="${WG_DIR}/clients"
 DB="${WG_DIR}/ip-allocations.json"
 
+EMAIL_CMDS=""
+
 echo "=== Rotating server key ==="
 echo "All client configs will be regenerated. Clients must reimport."
 echo ""
