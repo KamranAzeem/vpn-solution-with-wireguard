@@ -22,7 +22,7 @@ usage() {
   echo "  --name  Full client name (e.g. kamran-wbitt-com-laptop-office)"
   echo ""
   echo "To find the client name, run: ls ${CLIENTS_DIR}/"
-  exit 1
+  exit 0
 }
 
 CLIENT_NAME=""

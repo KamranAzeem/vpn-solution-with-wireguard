@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+  echo "Usage: $0"
+  echo ""
+  echo "Regenerates the server WireGuard key and all client configs."
+  echo "All clients must reimport their config after this operation."
+  exit 1
+}
+
+if [[ $# -gt 0 ]]; then
+  usage
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 CONFIG="${REPO_DIR}/vpn.conf"
