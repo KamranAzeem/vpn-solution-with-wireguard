@@ -1,0 +1,23 @@
+# msmtp configuration for email-config.sh
+# Place this file at ~/.msmtprc on the server
+# chmod 600 ~/.msmtprc  (must be readable only by root)
+
+account default
+
+# SMTP relay host and port
+# Port 587 for STARTTLS, port 465 for SSL/TLS
+host smtp.your-provider.com
+port 587
+
+# Authentication
+auth on
+from vpn-admin@your-domain.com
+user vpn-admin@your-domain.com
+password your-smtp-password
+
+# TLS settings
+tls on
+tls_starttls on         # set to 'off' when using port 465
+
+# Logging
+logfile /var/log/msmtp.log

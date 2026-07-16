@@ -98,7 +98,8 @@ vpn-solution-with-wireguard/
     ├── delete-client.sh
     ├── rotate-server-key.sh
     ├── email-config.sh
-    └── email-template.md       # Email body (not a script)
+    ├── email-template.md       # Email body (not a script)
+    └── msmtprc.example         # SMTP relay config template
 
 # Runtime data (created by initial-setup.sh and scripts)
 /etc/wireguard/
@@ -299,6 +300,17 @@ sudo wg-quick up wg-client
 ## Delivering a Config
 
 ### Option A — Automated email
+
+First, configure the SMTP relay on the server:
+
+```bash
+# From the repo
+cp support-files/msmtprc.example ~/.msmtprc
+nano ~/.msmtprc          # Set your SMTP host, port, credentials
+chmod 600 ~/.msmtprc
+```
+
+Then send the config:
 
 ```bash
 cd /root/vpn-solution-with-wireguard
