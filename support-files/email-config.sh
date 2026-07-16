@@ -64,11 +64,16 @@ fi
 # Build email subject
 SUBJECT="WireGuard VPN Config — ${CLIENT_NAME}"
 
-# Build email body from template if available, otherwise use inline default
+# Build email body
 CLIENT_IP=$(jq -r --arg n "$CLIENT_NAME" '.allocations | to_entries[] | select(.value == $n) | .key' "$DB" 2>/dev/null || echo "unknown")
+SERVER="${WG_ENDPOINT:-vpn.do.wbitt.com}"
+PORT="${WG_PORT:-51820}"
 
 if [[ -f "$TEMPLATE" ]]; then
-  BODY=$(cat "$TEMPLATE")
+  BODY=$(cat "$TEMPLATE" \
+    | sed "s|__SERVER_ENDPOINT__|${SERVER}|g" \
+    | sed "s|__SERVER_PORT__|${PORT}|g" \
+    | sed "s|__CLIENT_IP__|${CLIENT_IP}|g")
 else
   BODY="Hi,
 
@@ -79,7 +84,7 @@ To import:
   2. Open the app and import the attached config file
   3. Activate the tunnel
 
-Server endpoint: ${WG_ENDPOINT:-vpn.do.wbitt.com}:${WG_PORT:-51820}
+Server endpoint: ${SERVER}:${PORT}
 Your IP: ${CLIENT_IP}"
 fi
 

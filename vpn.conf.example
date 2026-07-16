@@ -15,14 +15,14 @@ WG_SERVER_IP="192.168.111.1"
 WG_INTERFACE="ens3"
 
 # Public endpoint (hostname or IP)
-WG_ENDPOINT="vpn.do.wbitt.com"
+WG_ENDPOINT="vpn.example.com"
 WG_PORT=51820
 
 # DNS pushed to clients
 WG_DNS="1.1.1.1"
 
 # Email sender for automated config delivery
-FROM_EMAIL="info@azeemconsulting.com"
+FROM_EMAIL="vpn-admin@example.com"
 
 # Sender display name for email notifications
 FROM_EMAIL_NAME="VPN admin"

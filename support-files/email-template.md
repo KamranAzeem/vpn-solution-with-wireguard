@@ -9,18 +9,22 @@ You can use:
 
 ## Installation and configuration:
 
-1. Save the attached `.conf` file at a secure place on your computer. Then, rename the file to a smaller name such as `wg-yourname.conf`.
+1. Save the attached `.conf` file at a secure place on your computer.
 2. Download and install WireGuard from https://wireguard.com/install
-3. Open the WireGuard application on your computer, and import the tunnel configuration using the file you saved (and renamed) in step 1.
+3. Open the WireGuard application on your computer, and import the tunnel configuration using the file you saved in step 1.
 4. Click **Activate**.
+
+Server endpoint: __SERVER_ENDPOINT__:__SERVER_PORT__
+Your VPN IP: __CLIENT_IP__
 
 ## Verification / validation:
 
-* After the tunnel is active, visit the two URLs provided below to check if they show the public IP of the VPN server instead of the IP assigned to you from your ISP. All traffic from your computer must now show up as originating from the VPN server including  - **very important** - the DNS traffic. 
-* Search the ipleak.net web-page. There should be no mention of your country or city or your isp, etc. **This is important to verify.**
+After the tunnel is active, visit the following URLs to check if they show the public IP of the VPN server instead of the IP assigned to you from your ISP:
 
 * https://www.whatismyip.com/
 * https://ipleak.net
+
+There should be no mention of your country, city, or ISP on ipleak.net.
 
 Regards,
 Kamran

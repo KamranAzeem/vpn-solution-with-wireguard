@@ -68,7 +68,7 @@ while IFS= read -r ip; do
     AVAILABLE_IP="$ip_clean"
     break
   fi
-done < <(jq -r '.allocations | keys[]' "$DB")
+done < <(jq -r '.allocations | to_entries | sort_by(.key | split(".") | map(tonumber)) | .[] | .key' "$DB")
 
 if [[ -z "$AVAILABLE_IP" ]]; then
   echo "Error: no available IP addresses."
