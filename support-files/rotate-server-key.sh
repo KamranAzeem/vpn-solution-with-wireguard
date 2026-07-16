@@ -94,6 +94,8 @@ WGEOF
   cat > "${client_dir}/${name}.conf" << WGEOF
 [Interface]
 Address = ${ip}/24
+PostUp = sysctl -w net.ipv6.conf.all.disable_ipv6=1
+PreDown = sysctl -w net.ipv6.conf.all.disable_ipv6=0
 PrivateKey = ${client_key}
 DNS = ${WG_DNS:-1.1.1.1}
 

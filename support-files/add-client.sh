@@ -88,6 +88,8 @@ ALLOWED_IPS="${ALLOWED_IPS:-0.0.0.0/0}"
 cat > "${CLIENT_NAME}.conf" << WGEOF
 [Interface]
 Address = ${AVAILABLE_IP}/24
+PostUp = sysctl -w net.ipv6.conf.all.disable_ipv6=1
+PreDown = sysctl -w net.ipv6.conf.all.disable_ipv6=0
 PrivateKey = $(cat client.key)
 DNS = ${WG_DNS:-1.1.1.1}
 
