@@ -8,7 +8,7 @@ CONFIG="${REPO_DIR}/vpn.conf"
 if [[ -f "$CONFIG" ]]; then
   source "$CONFIG"
 else
-  echo "Error: ${CONFIG} not found. Run from the vpn-solution repo."
+  echo "Error: ${CONFIG} not found. Copy vpn.conf.example to vpn.conf and edit it."
   exit 1
 fi
 
@@ -88,4 +88,11 @@ systemctl restart wg-quick@wg0
 echo ""
 echo "=== Rotation complete ==="
 echo "New server public key: ${NEW_SERVER_PUB}"
-echo "Distribute new configs to all clients."
+echo ""
+echo "To email all clients their updated config:"
+echo "  for d in ${CLIENTS_DIR}/*/; do"
+echo "    name=\$(basename \"\$d\")"
+echo "    ${SCRIPT_DIR}/email-config.sh --name \"\$name\" --email <user-email>"
+echo "  done"
+echo ""
+echo "Or distribute the configs manually from: ${CLIENTS_DIR}/"

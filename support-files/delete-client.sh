@@ -8,7 +8,7 @@ CONFIG="${REPO_DIR}/vpn.conf"
 if [[ -f "$CONFIG" ]]; then
   source "$CONFIG"
 else
-  echo "Error: ${CONFIG} not found. Run from the vpn-solution repo."
+  echo "Error: ${CONFIG} not found. Copy vpn.conf.example to vpn.conf and edit it."
   exit 1
 fi
 

@@ -8,7 +8,11 @@ REPO_DIR="$(dirname "$SCRIPT_DIR")"
 CONFIG="${REPO_DIR}/vpn.conf"
 
 if [[ ! -f "$CONFIG" ]]; then
-  echo "Error: ${CONFIG} not found. Edit vpn.conf first."
+  echo "Error: ${CONFIG} not found."
+  echo ""
+  echo "  Copy the example config and edit it:"
+  echo "    cp ${REPO_DIR}/vpn.conf.example ${CONFIG}"
+  echo "    nano ${CONFIG}"
   exit 1
 fi
 source "$CONFIG"
@@ -190,5 +194,6 @@ echo "Server public key: ${SERVER_PUB}"
 echo ""
 echo "Next steps:"
 echo "  1. Configure DigitalOcean Cloud Firewall (UDP ${WG_PORT})"
-echo "  2. Add clients: ${SCRIPT_DIR}/add-client.sh"
+echo "  2. Add clients: ${SCRIPT_DIR}/add-client.sh
+Email client: ${SCRIPT_DIR}/email-config.sh --name <name> --email <email>"
 echo "  3. See runbook.md in ${REPO_DIR} for operations"

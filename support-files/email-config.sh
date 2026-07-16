@@ -4,11 +4,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 CONFIG="${REPO_DIR}/vpn.conf"
+TEMPLATE="${SCRIPT_DIR}/email-template.md"
 
 if [[ -f "$CONFIG" ]]; then
   source "$CONFIG"
 else
-  echo "Error: ${CONFIG} not found. Run from the vpn-solution repo."
+  echo "Error: ${CONFIG} not found. Copy vpn.conf.example to vpn.conf and edit it."
   exit 1
 fi
 
@@ -16,12 +17,14 @@ WG_DIR="${WG_DIR:-/etc/wireguard}"
 CLIENTS_DIR="${WG_DIR}/clients"
 DB="${WG_DIR}/ip-allocations.json"
 FROM_EMAIL="${FROM_EMAIL:-vpn-admin@example.com}"
+ENCRYPT_CONFIG="${ENCRYPT_CONFIG:-true}"
 
 usage() {
-  echo "Usage: $0 --name <client-name> --email <recipient-email>"
+  echo "Usage: $0 --name <client-name> --email <recipient-email> [--plain]"
   echo ""
   echo "  --name   Full client name"
   echo "  --email  Recipient's email address"
+  echo "  --plain  Send config as plaintext (no GPG encryption)"
   echo ""
   echo "Prerequisites:"
   echo "  1. Install msmtp:  dnf install -y msmtp"
@@ -40,11 +43,12 @@ usage() {
   exit 1
 }
 
-CLIENT_NAME=""; RECIPIENT=""
+CLIENT_NAME=""; RECIPIENT=""; PLAIN=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --name)  CLIENT_NAME="$2"; shift 2 ;;
     --email) RECIPIENT="$2";   shift 2 ;;
+    --plain) PLAIN=true; shift ;;
     *) echo "Unknown arg: $1"; usage ;;
   esac
 done
@@ -61,27 +65,43 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
   exit 1
 fi
 
-echo -n "Encryption password (share out of band): "
-read -s ENC_PASS
-echo ""
-
-gpg --batch --yes --passphrase "$ENC_PASS" --symmetric --cipher-algo AES256 "$CONFIG_FILE"
-
-ENCRYPTED_FILE="${CONFIG_FILE}.gpg"
+# Build email subject
 SUBJECT="WireGuard VPN Config — ${CLIENT_NAME}"
-BODY="Hi,
+
+# Build email body from template if available, otherwise use inline default
+CLIENT_IP=$(jq -r --arg n "$CLIENT_NAME" '.allocations | to_entries[] | select(.value == $n) | .key' "$DB" 2>/dev/null || echo "unknown")
+
+if [[ -f "$TEMPLATE" ]]; then
+  BODY=$(cat "$TEMPLATE")
+else
+  BODY="Hi,
 
 Your WireGuard VPN config is attached.
 
 To import:
   1. Install WireGuard from https://www.wireguard.com/install/
-  2. Open the app and import the attached .conf file
+  2. Open the app and import the attached config file
   3. Activate the tunnel
 
 Server endpoint: ${WG_ENDPOINT:-vpn.do.wbitt.com}:${WG_PORT:-51820}
-Your IP: $(jq -r --arg n "$CLIENT_NAME" '.allocations | to_entries[] | select(.value == $n) | .key' "$DB")
+Your IP: ${CLIENT_IP}"
+fi
 
-The decryption password was shared with you separately."
+# Attach and send
+if [[ "$ENCRYPT_CONFIG" == "true" && "$PLAIN" == "false" ]]; then
+  echo -n "Encryption password (share out of band): "
+  read -s ENC_PASS
+  echo ""
+  gpg --batch --yes --passphrase "$ENC_PASS" --symmetric --cipher-algo AES256 "$CONFIG_FILE"
+
+  ATTACHMENT="${CONFIG_FILE}.gpg"
+  ATTACH_FILENAME="${CLIENT_NAME}.conf.gpg"
+  echo "  Config encrypted: ${ATTACH_FILENAME}"
+else
+  ATTACHMENT="$CONFIG_FILE"
+  ATTACH_FILENAME="${CLIENT_NAME}.conf"
+  echo "  Config attached as plaintext"
+fi
 
 {
   echo "From: WireGuard VPN <${FROM_EMAIL}>"
@@ -96,16 +116,15 @@ The decryption password was shared with you separately."
   echo "${BODY}"
   echo ""
   echo "--==BOUND_$(date +%s)"
-  echo "Content-Type: application/octet-stream; name=\"${CLIENT_NAME}.conf.gpg\""
-  echo "Content-Disposition: attachment; filename=\"${CLIENT_NAME}.conf.gpg\""
+  echo "Content-Type: application/octet-stream; name=\"${ATTACH_FILENAME}\""
+  echo "Content-Disposition: attachment; filename=\"${ATTACH_FILENAME}\""
   echo "Content-Transfer-Encoding: base64"
   echo ""
-  base64 "$ENCRYPTED_FILE"
+  base64 "$ATTACHMENT"
   echo ""
   echo "--==BOUND_$(date +%s)--"
 } | msmtp --account=gmail -t
 
 echo ""
 echo "=== Email sent to ${RECIPIENT} ==="
-echo "  Config: ${CLIENT_NAME}.conf.gpg"
-echo "Share the password out of band."
+echo "  Attachment: ${ATTACH_FILENAME}"

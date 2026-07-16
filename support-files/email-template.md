@@ -16,7 +16,8 @@ You can use:
 
 ## Verification / validation:
 
-After the tunnel is active, visit the following two URLs to check if they show the public IP of the VPN server instead of the IP assigned to you from your ISP.
+* After the tunnel is active, visit the two URLs provided below to check if they show the public IP of the VPN server instead of the IP assigned to you from your ISP. All traffic from your computer must now show up as originating from the VPN server including  - **very important** - the DNS traffic. 
+* Search the ipleak.net web-page. There should be no mention of your country or city or your isp, etc. **This is important to verify.**
 
 * https://www.whatismyip.com/
 * https://ipleak.net

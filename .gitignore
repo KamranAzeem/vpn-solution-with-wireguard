@@ -1,3 +1,9 @@
 # Ignore client configs and private keys
-*.conf
 *.key
+
+# Ignore user-edited vpn.conf but track the example
+vpn.conf
+
+# Ignore generated client .conf files
+clients/**/*.conf
+clients/**/*.key
