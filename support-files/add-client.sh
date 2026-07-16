@@ -101,6 +101,9 @@ WGEOF
 wg set wg0 peer "${CLIENT_PUB}" allowed-ips "${AVAILABLE_IP}/32"
 wg-quick save wg0
 
+# Store recipient email for future key rotations
+echo "$EMAIL" > "${CLIENT_DIR}/client.email"
+
 jq --arg ip "$AVAILABLE_IP" --arg name "$CLIENT_NAME" \
   '.allocations[$ip] = $name' "$DB" > "${DB}.tmp" && mv "${DB}.tmp" "$DB"
 
@@ -109,6 +112,7 @@ echo "=== Client ${CLIENT_NAME} added ==="
 echo "  IP:         ${AVAILABLE_IP}"
 echo "  Config:     ${CLIENT_DIR}/${CLIENT_NAME}.conf"
 echo "  Public key: ${CLIENT_PUB}"
+echo "  Email:      ${EMAIL}"
 echo ""
 echo "Deliver via:"
 echo "  SCP:  scp root@<vps>:${CLIENT_DIR}/${CLIENT_NAME}.conf ."

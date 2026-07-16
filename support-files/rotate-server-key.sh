@@ -105,7 +105,14 @@ PersistentKeepalive = 25
 WGEOF
 
   echo "  Updated: ${name} (${ip})"
-  EMAIL_CMDS="${EMAIL_CMDS}  ${SCRIPT_DIR}/email-config.sh --name ${name} --email <${name}-email> --plain"$'\n'
+  CLIENT_EMAIL=""
+  if [[ -f "${client_dir}/client.email" ]]; then
+    CLIENT_EMAIL=$(cat "${client_dir}/client.email")
+    EMAIL_CMDS="${EMAIL_CMDS}  ${SCRIPT_DIR}/email-config.sh --name ${name} --email ${CLIENT_EMAIL} --plain"$'\n'
+  else
+    EMAIL_CMDS="${EMAIL_CMDS}  # ${name} — no email on file, add --email <addr> manually"$'\n'
+    EMAIL_CMDS="${EMAIL_CMDS}  # ${SCRIPT_DIR}/email-config.sh --name ${name} --email <addr> --plain"$'\n'
+  fi
 done < <(find "$CLIENTS_DIR" -mindepth 1 -maxdepth 1 -type d)
 
 systemctl restart wg-quick@wg0
@@ -114,5 +121,5 @@ echo ""
 echo "=== Rotation complete ==="
 echo "New server public key: ${NEW_SERVER_PUB}"
 echo ""
-echo "To email each client their updated config (replace <name-email> for each):"
+echo "To email each client their updated config:"
 echo "${EMAIL_CMDS}"
