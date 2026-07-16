@@ -408,6 +408,17 @@ If it returns `0`, re-apply the commands below.
 
 ### Linux
 
+**Method 1 — Per-tunnel (safety net via client config)**
+
+Add these lines under `[Interface]` in the client `.conf` file that WireGuard imports. IPv6 is disabled when the tunnel activates and re-enabled when it disconnects.
+
+```ini
+PostUp = sysctl -w net.ipv6.conf.all.disable_ipv6=1
+PreDown = sysctl -w net.ipv6.conf.all.disable_ipv6=0
+```
+
+**Method 2 — System-wide (permanent)**
+
 ```bash
 cat > /etc/sysctl.d/99-disable-ipv6.conf << EOF
 net.ipv6.conf.all.disable_ipv6 = 1
@@ -415,6 +426,8 @@ net.ipv6.conf.default.disable_ipv6 = 1
 EOF
 sudo sysctl -p /etc/sysctl.d/99-disable-ipv6.conf
 ```
+
+Both methods are recommended together. Method 1 covers accidental tunnel reconnects; method 2 ensures IPv6 stays off even when the tunnel is down.
 
 ### Windows
 
