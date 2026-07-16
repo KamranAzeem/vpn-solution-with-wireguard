@@ -39,6 +39,12 @@ usage() {
   exit 1
 }
 
+# Check msmtp is installed
+if ! command -v msmtp &>/dev/null; then
+  echo "Error: msmtp not found. Install it: dnf install -y msmtp"
+  exit 1
+fi
+
 CLIENT_NAME=""; RECIPIENT=""; PLAIN=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -65,15 +71,17 @@ fi
 SUBJECT="WireGuard VPN Config — ${CLIENT_NAME}"
 
 # Build email body
-CLIENT_IP=$(jq -r --arg n "$CLIENT_NAME" '.allocations | to_entries[] | select(.value == $n) | .key' "$DB" 2>/dev/null || echo "unknown")
+CLIENT_IP=$(jq -r --arg n "$CLIENT_NAME" '.allocations | to_entries[] | select(.value == $n) | .key' "$DB")
+if [[ -z "$CLIENT_IP" ]]; then
+  CLIENT_IP="unknown"
+fi
 SERVER="${WG_ENDPOINT:-vpn.do.wbitt.com}"
 PORT="${WG_PORT:-51820}"
 
 if [[ -f "$TEMPLATE" ]]; then
-  BODY=$(cat "$TEMPLATE" \
-    | sed "s|__SERVER_ENDPOINT__|${SERVER}|g" \
-    | sed "s|__SERVER_PORT__|${PORT}|g" \
-    | sed "s|__CLIENT_IP__|${CLIENT_IP}|g")
+  BODY=$(sed -e "s|__SERVER_ENDPOINT__|${SERVER}|g" \
+             -e "s|__SERVER_PORT__|${PORT}|g" \
+             -e "s|__CLIENT_IP__|${CLIENT_IP}|g" "$TEMPLATE")
 else
   BODY="Hi,
 
@@ -93,7 +101,7 @@ if [[ "$ENCRYPT_CONFIG" == "true" && "$PLAIN" == "false" ]]; then
   echo -n "Encryption password (share out of band): "
   read -s ENC_PASS
   echo ""
-  gpg --batch --yes --passphrase "$ENC_PASS" --symmetric --cipher-algo AES256 "$CONFIG_FILE"
+  gpg --batch --yes --passphrase-fd 0 --symmetric --cipher-algo AES256 "$CONFIG_FILE" <<<"$ENC_PASS"
 
   ATTACHMENT="${CONFIG_FILE}.gpg"
   ATTACH_FILENAME="${CLIENT_NAME}.conf.gpg"
@@ -104,26 +112,27 @@ else
   echo "  Config attached as plaintext"
 fi
 
+BOUNDARY=$(date +%s%N)
 {
   echo "From: ${FROM_EMAIL_NAME} <${FROM_EMAIL}>"
   echo "To: ${RECIPIENT}"
   echo "Subject: ${SUBJECT}"
   echo "MIME-Version: 1.0"
-  echo "Content-Type: multipart/mixed; boundary=\"==BOUND_$(date +%s)\""
+  echo "Content-Type: multipart/mixed; boundary=\"==BOUND_${BOUNDARY}\""
   echo ""
-  echo "--==BOUND_$(date +%s)"
+  echo "--==BOUND_${BOUNDARY}"
   echo "Content-Type: text/plain; charset=utf-8"
   echo ""
   echo "${BODY}"
   echo ""
-  echo "--==BOUND_$(date +%s)"
+  echo "--==BOUND_${BOUNDARY}"
   echo "Content-Type: application/octet-stream; name=\"${ATTACH_FILENAME}\""
   echo "Content-Disposition: attachment; filename=\"${ATTACH_FILENAME}\""
   echo "Content-Transfer-Encoding: base64"
   echo ""
   base64 "$ATTACHMENT"
   echo ""
-  echo "--==BOUND_$(date +%s)--"
+  echo "--==BOUND_${BOUNDARY}--"
 } | msmtp --account="${SMTP_ACCOUNT}" -t
 
 echo ""
