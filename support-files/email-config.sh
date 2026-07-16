@@ -17,6 +17,7 @@ WG_DIR="${WG_DIR:-/etc/wireguard}"
 CLIENTS_DIR="${WG_DIR}/clients"
 DB="${WG_DIR}/ip-allocations.json"
 FROM_EMAIL="${FROM_EMAIL:-vpn-admin@example.com}"
+SMTP_ACCOUNT="${SMTP_ACCOUNT:-default}"
 ENCRYPT_CONFIG="${ENCRYPT_CONFIG:-true}"
 
 usage() {
@@ -32,10 +33,8 @@ usage() {
   echo "       cp support-files/msmtprc.example ~/.msmtprc"
   echo "       nano ~/.msmtprc"
   echo "     chmod 600 ~/.msmtprc"
-  echo "  3. Adjust the SMTP relay settings to match your provider."
-  echo "     For Gmail, set port 587, tls_starttls on,"
-  echo "     and use an App Password from:"
-  echo "     https://myaccount.google.com/apppasswords"
+  echo "  3. Set SMTP_ACCOUNT in vpn.conf to match the account name"
+  echo "     in ~/.msmtprc (e.g. SMTP_ACCOUNT=\"a2hosting\")"
   exit 1
 }
 
@@ -119,7 +118,7 @@ fi
   base64 "$ATTACHMENT"
   echo ""
   echo "--==BOUND_$(date +%s)--"
-} | msmtp --account=gmail -t
+} | msmtp --account="${SMTP_ACCOUNT}" -t
 
 echo ""
 echo "=== Email sent to ${RECIPIENT} ==="
