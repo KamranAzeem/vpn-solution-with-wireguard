@@ -17,6 +17,7 @@ WG_DIR="${WG_DIR:-/etc/wireguard}"
 CLIENTS_DIR="${WG_DIR}/clients"
 DB="${WG_DIR}/ip-allocations.json"
 FROM_EMAIL="${FROM_EMAIL:-vpn-admin@example.com}"
+FROM_EMAIL_NAME="${FROM_EMAIL_NAME:-VPN admin}"
 SMTP_ACCOUNT="${SMTP_ACCOUNT:-default}"
 ENCRYPT_CONFIG="${ENCRYPT_CONFIG:-true}"
 
@@ -99,7 +100,7 @@ else
 fi
 
 {
-  echo "From: VPN admin <${FROM_EMAIL}>"
+  echo "From: ${FROM_EMAIL_NAME} <${FROM_EMAIL}>"
   echo "To: ${RECIPIENT}"
   echo "Subject: ${SUBJECT}"
   echo "MIME-Version: 1.0"
