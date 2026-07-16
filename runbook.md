@@ -156,8 +156,7 @@ vpn  IN  A  <your-droplet-public-ip>
 ```bash
 ssh root@<your-vps>
 cd /root
-# Copy the repo (or git clone if hosted)
-scp -r <your-machine>:/path/to/vpn-solution-with-wireguard /root/
+git clone <your-repo-url> vpn-solution-with-wireguard
 ```
 
 ### 3. Configure

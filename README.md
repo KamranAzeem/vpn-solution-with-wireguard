@@ -23,10 +23,10 @@ This project provides a complete, automated solution: from provisioning a bare V
 ## Quickstart
 
 ```bash
-# Copy the repo to a new VPS and bootstrap
+# Clone the repo on a new VPS and bootstrap
 ssh root@<your-vps>
 cd /root
-scp -r <your-machine>:/path/to/vpn-solution-with-wireguard /root/
+git clone <your-repo-url> vpn-solution-with-wireguard
 cd /root/vpn-solution-with-wireguard
 cp vpn.conf.example vpn.conf
 nano vpn.conf
