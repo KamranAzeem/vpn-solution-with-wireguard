@@ -301,9 +301,11 @@ sudo wg-quick up wg-client
 
 ### Option A — Automated email
 
-First, configure the SMTP relay on the server:
+First, install `msmtp` and configure the SMTP relay:
 
 ```bash
+dnf install -y msmtp
+
 # From the repo
 cp support-files/msmtprc.example ~/.msmtprc
 nano ~/.msmtprc          # Set your SMTP host, port, credentials
