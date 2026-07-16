@@ -395,7 +395,16 @@ Overhead is minimal.
 
 ## Disable IPv6 on the Client
 
-Without disabling IPv6, your IPv6 traffic bypasses the tunnel and leaks your real IP.
+Without disabling IPv6, your IPv6 traffic bypasses the tunnel and leaks your real IP. You will see your local ISP and location on ipleak.net even when the VPN is active.
+
+**Important**: The sysctl setting survives reboots only if the file `/etc/sysctl.d/99-disable-ipv6.conf` exists. After any reboot, verify with:
+
+```bash
+cat /proc/sys/net/ipv6/conf/all/disable_ipv6
+# Should output: 1
+```
+
+If it returns `0`, re-apply the commands below.
 
 ### Linux
 
@@ -555,6 +564,12 @@ To make this persistent across reboots:
 ```bash
 echo 'kernel.dyndbg="module wireguard +p"' > /etc/sysctl.d/99-wireguard-debug.conf
 ```
+
+**Interpreting the logs**:
+
+- `Receiving handshake initiation` / `Sending handshake response` — client connected or reconnected.
+- `Keypair X created for peer Y` — new encryption keys negotiated (normal).
+- `Packet has unallowed src IP (192.168.x.x) from peer` — the client sent a packet with its local LAN IP through the tunnel instead of the VPN IP. WireGuard drops it because it does not match the peer's `AllowedIPs`. These are harmless and happen when `AllowedIPs = 0.0.0.0/0` is used with policy routing — some stray packets use the wrong source IP. Your traffic still works because the policy routing handles the correct packets.
 
 ### Restarting WireGuard
 
