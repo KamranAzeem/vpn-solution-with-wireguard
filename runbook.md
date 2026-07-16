@@ -219,6 +219,17 @@ Email `kamran@wbitt.com` → `kamran-at-wbitt-dot-com`. Append `-<device>-<alias
 
 Supported device types: `laptop`, `desktop`, `phone`, `tablet`, `server`.
 
+Add this function to `~/.bashrc` on the server so it is always available when SSH-ing:
+
+```bash
+echo '
+email_to_name() {
+  echo "$1" | sed "s/@/-at-/g; s/\./-dot-/g"
+}
+' >> ~/.bashrc
+source ~/.bashrc
+```
+
 ---
 
 ## Adding a Client
