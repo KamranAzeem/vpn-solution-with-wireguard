@@ -69,7 +69,17 @@ while IFS= read -r client_dir; do
     continue
   fi
 
-  client_pub=$(cat "${client_dir}/client.key.pub")
+  # Support both naming styles: client.key.pub (new) and <name>.key.pub (legacy)
+  if [[ -f "${client_dir}/client.key.pub" ]]; then
+    KEY_PREFIX="${client_dir}/client"
+  elif [[ -f "${client_dir}/${name}.key.pub" ]]; then
+    KEY_PREFIX="${client_dir}/${name}"
+  else
+    echo "  Skipping ${name} — no key files found"
+    continue
+  fi
+
+  client_pub=$(cat "${KEY_PREFIX}.key.pub")
 
   cat >> wg0.conf << WGEOF
 
@@ -78,7 +88,7 @@ PublicKey = ${client_pub}
 AllowedIPs = ${ip}/32
 WGEOF
 
-  client_key=$(cat "${client_dir}/client.key")
+  client_key=$(cat "${KEY_PREFIX}.key")
   cat > "${client_dir}/${name}.conf" << WGEOF
 [Interface]
 Address = ${ip}/24
