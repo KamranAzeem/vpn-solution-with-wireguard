@@ -99,7 +99,7 @@ else
 fi
 
 {
-  echo "From: WireGuard VPN <${FROM_EMAIL}>"
+  echo "From: VPN admin <${FROM_EMAIL}>"
   echo "To: ${RECIPIENT}"
   echo "Subject: ${SUBJECT}"
   echo "MIME-Version: 1.0"
