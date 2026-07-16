@@ -103,6 +103,7 @@ PersistentKeepalive = 25
 WGEOF
 
   echo "  Updated: ${name} (${ip})"
+  EMAIL_CMDS="${EMAIL_CMDS}  ${SCRIPT_DIR}/email-config.sh --name ${name} --email <${name}-email> --plain"$'\n'
 done < <(find "$CLIENTS_DIR" -mindepth 1 -maxdepth 1 -type d)
 
 systemctl restart wg-quick@wg0
@@ -111,10 +112,5 @@ echo ""
 echo "=== Rotation complete ==="
 echo "New server public key: ${NEW_SERVER_PUB}"
 echo ""
-echo "To email all clients their updated config:"
-echo "  for d in ${CLIENTS_DIR}/*/; do"
-echo "    name=\$(basename \"\$d\")"
-echo "    ${SCRIPT_DIR}/email-config.sh --name \"\$name\" --email <user-email>"
-echo "  done"
-echo ""
-echo "Or distribute the configs manually from: ${CLIENTS_DIR}/"
+echo "To email each client their updated config (replace <name-email> for each):"
+echo "${EMAIL_CMDS}"
