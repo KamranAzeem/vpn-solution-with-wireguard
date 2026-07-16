@@ -536,6 +536,26 @@ sysctl net.ipv4.ip_forward
 journalctl -u wg-quick@wg0 --no-pager -n 30
 ```
 
+### Connection Monitoring
+
+WireGuard does not log client connections or disconnections by default. Only service start/stop events appear in the journal.
+
+To see live handshake events (client connects, reconnects, or times out):
+
+```bash
+# Enable dynamic debug for the wireguard kernel module
+echo 'module wireguard +p' > /sys/kernel/debug/dynamic_debug/control
+
+# Watch kernel logs for WG events
+journalctl -kf
+```
+
+To make this persistent across reboots:
+
+```bash
+echo 'kernel.dyndbg="module wireguard +p"' > /etc/sysctl.d/99-wireguard-debug.conf
+```
+
 ### Restarting WireGuard
 
 **Warning**: This briefly disconnects all clients.
