@@ -63,7 +63,7 @@ fi
 AVAILABLE_IP=""
 while IFS= read -r ip; do
   ip_clean=$(echo "$ip" | tr -d ' ",')
-  value=$(jq -r --arg ip "$ip_clean" '.allocations[$ip] // "error"' "$DB")
+  value=$(jq -r --arg ip "$ip_clean" '.allocations[$ip]' "$DB")
   if [[ "$value" == "null" ]]; then
     AVAILABLE_IP="$ip_clean"
     break
